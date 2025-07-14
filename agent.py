@@ -33,18 +33,20 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 # 'model_name' is the specific model identifier.
 MAIN_MODEL_CONFIG = {
     "model_provider": "qwen",  # 'anthropic' or 'qwen'
-    "model_name": "Qwen/Qwen3-8B",
+    "model_name": "Qwen/Qwen3-14B",
 }
 
 DISTILLATION_MODEL_CONFIG = {
     "model_provider": "qwen",  # 'anthropic' or 'qwen'
-    "model_name": "Qwen/Qwen3-8B",
+    "model_name": "Qwen/Qwen3-14B",
 }
 
 
 # --- 4. LLM Provider Class ---
 # This class wraps different LLM backends (Anthropic API, local Transformers)
 # and provides a unified interface for the agent.
+
+from openai import OpenAI
 
 class LLMProvider:
     """A wrapper for different language model providers."""
@@ -53,8 +55,8 @@ class LLMProvider:
         self.model_provider = model_provider
         self.model_name = model_name
         self.kwargs = kwargs
-        self.model = None
-        self.tokenizer = None
+        self.client = None # For API-based models
+        self.model = None # For library-based models like Anthropic
 
         if self.model_provider == 'anthropic':
             if not ANTHROPIC_API_KEY:
@@ -62,14 +64,10 @@ class LLMProvider:
             self.model = ChatAnthropic(api_key=ANTHROPIC_API_KEY, model=self.model_name, **self.kwargs)
 
         elif self.model_provider == 'qwen':
-            if not all([torch, AutoModelForCausalLM, AutoTokenizer]):
-                raise ImportError("Please install torch and transformers (`pip install torch transformers accelerate`) to use Qwen models.")
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-            self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_name,
-                torch_dtype="auto",
-                device_map="auto", 
-
+            # Initialize the OpenAI client to point to the local vLLM server
+            self.client = OpenAI(
+                base_url="http://localhost:8000/v1",
+                api_key="not-needed"
             )
         else:
             raise ValueError(f"Unsupported model provider: {self.model_provider}")
@@ -79,16 +77,13 @@ class LLMProvider:
         if self.model_provider == 'anthropic':
             return self._invoke_anthropic(messages, thinking)
         elif self.model_provider == 'qwen':
-            return self._invoke_qwen(messages, thinking)
+            return self._invoke_qwen_api(messages, thinking)
 
     def _invoke_anthropic(self, messages: List[BaseMessage], thinking: bool) -> Dict[str, str]:
         """Handles invocation for Anthropic models."""
-        # Update kwargs with the thinking parameter for this call
         self.model.thinking = thinking
         response = self.model.invoke(messages)
-
-        thinking_trace = ""
-        final_response = ""
+        thinking_trace, final_response = "", ""
 
         if thinking and isinstance(response.content, list) and len(response.content) > 1:
             thinking_block = next((b for b in response.content if b.get("type") == "thinking"), None)
@@ -103,52 +98,44 @@ class LLMProvider:
             
         return {"response": final_response, "thinking": thinking_trace}
 
-    def _invoke_qwen(self, messages: List[BaseMessage], thinking: bool) -> Dict[str, str]:
-        """Handles invocation for local Qwen models."""
-        # Convert LangChain messages to the format Qwen expects
+    def _invoke_qwen_api(self, messages: List[BaseMessage], thinking: bool = False) -> Dict[str, str]:
+        """Handles invocation for Qwen models via a vLLM API endpoint."""
+        # 1. Convert LangChain messages to the OpenAI dictionary format
         qwen_messages = [{"role": "user" if m.type == "human" else m.type, "content": m.content} for m in messages]
-
-        text = self.tokenizer.apply_chat_template(
-            qwen_messages,
-            tokenize=False,
-            add_generation_prompt=True,
-            # Qwen's template enables thinking by default if available
-        )
-        model_inputs = self.tokenizer([text], return_tensors="pt").to(self.model.device)
-
-        generated_ids = self.model.generate(
-            **model_inputs,
-            max_new_tokens=4096, #32768, # Adjust as needed
-            # do_sample=True, # Add sampling for more varied responses
-            # temperature=0.7,
-            # top_p=0.9,
-        )
-        output_ids = generated_ids[0][len(model_inputs.input_ids[0]):].tolist()
-
-        if not thinking:
-            content = self.tokenizer.decode(output_ids, skip_special_tokens=True).strip()
-            return {"response": content, "thinking": ""}
-
-        # Parse thinking content by looking for the '</think>' token ID
-        try:
-            # The token ID for '</think>' in Qwen2 is 151646, Qwen1.5 is 151668
-            # We'll check for both for broader compatibility.
-            token_id = 151668
-            index = -1
-            # Find the last occurrence of the think token
-            rev_index = output_ids[::-1].index(token_id)
-            index = len(output_ids) - rev_index
-            
-            if index == -1: # Neither token was found
-                index = 0
-
-        except ValueError:
-            index = 0
-
-        thinking_content = self.tokenizer.decode(output_ids[:index], skip_special_tokens=True).strip()
-        content = self.tokenizer.decode(output_ids[index:], skip_special_tokens=True).strip()
         
-        return {"response": content, "thinking": thinking_content}
+        # 2. Call the vLLM server
+        try:
+            completion = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=qwen_messages,
+                max_tokens=4096,
+                temperature=0.7,
+            )
+            full_response_text = completion.choices[0].message.content
+        except Exception as e:
+            print(f"An error occurred while calling the vLLM server: {e}")
+            return {"response": "Error: Could not connect to the local model server.", "thinking": ""}
+
+        # 3. Manually parse the thinking block from the response string
+        thinking_content = ""
+        final_content = full_response_text
+
+        think_start_tag = "<think>"
+        think_end_tag = "</think>"
+        start_index = full_response_text.find(think_start_tag)
+        end_index = full_response_text.find(think_end_tag)
+
+        # Check if a valid <think>...</think> block exists
+        if start_index != -1 and end_index > start_index:
+            thinking_content = full_response_text[start_index + len(think_start_tag):end_index].strip()
+            final_content = full_response_text[end_index + len(think_end_tag):].strip()
+
+        # 4. Return the parsed response
+        # If thinking was not requested, we still strip the think block but return an empty thinking trace.
+        if not thinking:
+            return {"response": final_content, "thinking": ""}
+        else:
+            return {"response": final_content, "thinking": thinking_content}
 
 
 # --- 5. Define Graph State ---
