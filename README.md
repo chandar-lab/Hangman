@@ -21,6 +21,7 @@ conda activate ./venv
 Install all the required Python packages using pip.
 ```bash
 pip install -r requirements.txt
+pip install -e .
 ```
 
 3. **Serve the Language Model (Terminal 1)**
