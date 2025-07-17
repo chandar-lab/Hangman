@@ -36,3 +36,9 @@ In a second terminal (with the venv still activated), run the agent script. You 
 ```bash
 python agent.py
 ```
+
+And start playing! Try this prompt:
+
+```
+Let's play Hangman! You be the host. Think of a secret word, but don't tell me what it is. I'll try to guess it, one letter at a time. Just show me the blank spaces for the word to start.
+```
