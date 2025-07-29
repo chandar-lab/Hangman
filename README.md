@@ -10,21 +10,34 @@ The agent's backend is a local language model served with vLLM, providing an eff
 
 ## 🚀 Setup and Usage
 Follow these steps to set up the environment and run the agent.
-1. **Create a Conda Environment**
-First, create and activate a new Conda environment from your project's root directory.
-``` bash
-conda create --prefix=./venv python=3.11
-conda activate ./venv
+1. **Prerequisites**
+Make sure you have **Python 3.11+** and **Poetry** installed on your system. You can install Poetry by following the instructions on the [official website](https://python-poetry.org/docs/).
+
+2. **Clone the Repository**
+Clone this repository to your local machine and navigate into the project directory.
+```Bash
+git clone https://github.com/chandar-lab/Hangman.git
+cd hangman
 ```
 
-2. **Install Dependencies**
-Install all the required Python packages using pip.
-```bash
-pip install -r requirements.txt
-pip install -e .
+3. **Install Dependencies**
+Run the following command. Poetry will automatically create a virtual environment inside this project folder (`.venv`) and install all the necessary dependencies from the pyproject.toml file.
+```Bash
+poetry install
 ```
 
-3. **Serve the Language Model (Terminal 1)**
+4. **Activate the Virtual Environment**
+To activate the environment and start working on the project, use the poetry shell command.
+``` Bash
+source ./.venv/bin/activate
+```
+
+While to add a package run
+```Bash
+poetry add [package_name]
+```
+
+5. **Serve the Language Model (Terminal 1)**
 In your first terminal, start the vLLM server. This command will download the specified model and serve it at http://localhost:8000. Leave this terminal running.
 ```bash
 python -m vllm.entrypoints.openai.api_server \
@@ -32,9 +45,9 @@ python -m vllm.entrypoints.openai.api_server \
     --trust-remote-code
 ```
 
-4. Run the Agent (Terminal 2)
+6. **Run the Agent (Terminal 2)**
 In a second terminal (with the venv still activated), run the agent script. You can now start chatting with the agent.
-```bash
+```Bash
 python agent.py
 ```
 

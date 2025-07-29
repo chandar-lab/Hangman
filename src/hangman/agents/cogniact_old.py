@@ -9,7 +9,7 @@ from diff_match_patch import diff_match_patch
 from typing import List, Dict, Any
 from typing_extensions import TypedDict
 
-from hangman.llmprovider import LLMProvider
+from hangman.providers.llmprovider import LLMProvider
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
