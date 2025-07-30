@@ -13,8 +13,8 @@ The architecture is designed to be modular, separating the core logic of the exp
 ``` bash
 /hangman/
 |
-|-- 📄 pyproject.toml         # ✅ Poetry's main config and dependency file
-|-- 📄 poetry.lock            # ✅ Poetry's file for deterministic installs
+|-- 📄 pyproject.toml         # Poetry's main config and dependency file
+|-- 📄 poetry.lock            # Poetry's file for deterministic installs
 |-- 📄 README.md              # Project documentation
 |-- 📄 config.yaml            # For experiment configs (model names, runs, etc.)
 |-- 📄 run_experiment.py      # Main script to launch experiments
@@ -23,14 +23,14 @@ The architecture is designed to be modular, separating the core logic of the exp
 |
 |-- src
 |   └── hangman/
-|       |-- providers/ # NEW: Handles LLM provider logic
+|       |-- providers/ # Handles LLM provider logic
 |       | |-- llm_provider.py
 |       |-- engine.py # GameLoopController orchestrator
 |       |-- agents/
 |       | |-- base_agent.py
 |       | |-- stateless_agent.py
 |       | |-- react_agent.py
-|       | |-- pma_agent.py # Your agent using LangGraph
+|       | |-- cogniact.py # Your agent using LangGraph
 |       |-- games/
 |       | |-- base_game.py
 |       | |-- hangman.py
@@ -62,12 +62,12 @@ This list is prioritized to build the project from the ground up, ensuring a tes
 * ✅ **LLM Provider**: Create the `src/providers/llm_provider.py` to have a centralized factory function (`get_llm()`) that returns initialized `LangChain` model objects.
 
 ### Priority 2: Build a Single End-to-End Run 🔬
-* **Define Interfaces**: Implement the abstract base classes: `BaseAgent`, `BaseGame`, and `BasePlayer`.
-* Implement Core Components:
-    * Create the `StatelessAgent` as the first simple baseline.
+* ✅ **Define Interfaces**: Implement the abstract base classes: `BaseAgent`, `BaseGame`, and `BasePlayer`.
+* ✅ Implement Core Components:
+    * Create the `CogniAct` as the first simple baseline.
     * Create the `HangmanGame` class with its prompts and termination logic.
     * Create the `LLMPlayer` with only the Cooperative mode implemented initially.
-* **Build the Engine**: Implement the `GameLoopController` in `src/engine.py`. The goal is to be able to run a single game of Hangman with the stateless agent and have it save a complete JSON log to the `results/` directory.
+* ✅ **Build the Engine**: Implement the `GameLoopController` in `src/engine.py`. The goal is to be able to run a single game of Hangman with the stateless agent and have it save a complete JSON log to the `results/` directory.
 
 ### Priority 3: Implement Advanced Logic & Evaluation 🧠
 * **Develop Baselines**: Implement the more complex baseline agents, like the `ReActAgent`.

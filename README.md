@@ -2,6 +2,9 @@
 This project is a command-line conversational AI agent built using LangGraph. It features a private "working memory" that allows it to maintain context and evolve its understanding throughout a conversation, powered by a reasoning distillation loop.
 The agent's backend is a local language model served with vLLM, providing an efficient, OpenAI-compatible API for inference.
 
+![Alt text](assets/Main_Figure_Hangman.png "Optional Title")
+
+
 ## Key Features
  * 🧠 **Private Working Memory**: The agent maintains an internal state that is updated after each interaction.
  * 🤔 **Reasoning Distillation**: Uses a "diff and patch" model to reflect on conversations and decide what information to add or modify in its memory.
@@ -42,13 +45,20 @@ In your first terminal, start the vLLM server. This command will download the sp
 ```bash
 python -m vllm.entrypoints.openai.api_server \
     --model Qwen/Qwen3-14B \
-    --trust-remote-code
+    --trust-remote-code \
+    --port 8000 \
+    --dtype bfloat16
 ```
 
 6. **Run the Agent (Terminal 2)**
 In a second terminal (with the venv still activated), run the agent script. You can now start chatting with the agent.
 ```Bash
-python agent.py
+python src/hangman/agents/cogniact.py
+```
+
+or make the agent interact with the player by
+```Bash
+python src/hangman/engine.py
 ```
 
 And start playing! Try this prompt:
