@@ -1,6 +1,6 @@
 import os
 import yaml
-from typing import List, Any
+from typing import List, Any, Dict
 from diff_match_patch import diff_match_patch
 
 # --- Core LangChain/LangGraph Imports ---
@@ -8,20 +8,42 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph import END, StateGraph
 from langgraph.checkpoint.memory import MemorySaver
+from typing_extensions import TypedDict
 
 # --- Project-Specific Imports ---
 # Import the abstract base class and state definitions
-from hangman.agents.base_agent import BaseAgent, AgentState, ModelOutput
+from hangman.agents.base_agent import BaseAgent, ModelOutput
 # Import the unified LLM provider
 from hangman.providers.llmprovider import LLMProvider, load_llm_provider
 # Import prompts from a central location
-from hangman.prompts.cogniact import MAIN_SYSTEM_PROMPT, DISTILLATION_SYSTEM_PROMPT
+from hangman.prompts.readispatactagent import MAIN_SYSTEM_PROMPT, DISTILLATION_SYSTEM_PROMPT
 
+# --- Agent State Definition ---
 
-class CogniActAgent(BaseAgent):
+class AgentState(TypedDict):
     """
-    An agent that uses a "think-distill-update" cycle to maintain a
-    private working memory separate from its conversational history.
+    Represents the complete state of an agent at any point in time.
+    This structure is used by the LangGraph state machine.
+    """
+    # The public conversation messages
+    messages: List[BaseMessage]
+    
+    # The agent's private, internal knowledge and scratchpad
+    working_memory: Dict[str, Any]
+    
+    # The public-facing response for the current turn
+    response: str
+    
+    # The private thinking trace for the current turn
+    thinking: str
+
+    # The diff of changes made to the working memory
+    diff: str
+
+class ReaDisPatActAgent(BaseAgent):
+    """
+    An agent that uses a "think-distill-patch" cycle to maintain a
+    private working memory separate from its conversational messages.
     """
     def __init__(self, main_llm_provider: LLMProvider, distillation_llm_provider: LLMProvider):
         self.distillation_llm_provider = distillation_llm_provider
@@ -56,7 +78,7 @@ class CogniActAgent(BaseAgent):
             ("system", MAIN_SYSTEM_PROMPT),
         ]).format(working_memory=state["working_memory"])
         
-        messages = [SystemMessage(content=prompt)] + state["history"]
+        messages = [SystemMessage(content=prompt)] + state["messages"]
         
         # Use the main LLM provider passed during initialization
         result = self.llm_provider.invoke(messages, thinking=True)
@@ -69,11 +91,11 @@ class CogniActAgent(BaseAgent):
     def _generate_diff(self, state: AgentState) -> dict:
         """Generates a diff to update the working memory."""
         print("---NODE: GENERATING DIFF---")
-        history_str = "\n".join([f"{msg.type}: {msg.content}" for msg in state["history"]])
+        messages_str = "\n".join([f"{msg.type}: {msg.content}" for msg in state["messages"]])
         
         prompt_str = DISTILLATION_SYSTEM_PROMPT.format(
             working_memory=state["working_memory"],
-            history=history_str,
+            messages=messages_str,
             thinking=state["thinking"],
             response=state["response"],
         )
@@ -102,7 +124,7 @@ class CogniActAgent(BaseAgent):
             return {}
 
     # --- Method Implementations from BaseAgent ---
-    def invoke(self, history: List[BaseMessage]) -> ModelOutput:
+    def invoke(self, messages: List[BaseMessage]) -> ModelOutput:
         self.turn_counter += 1
         thread_config = {"configurable": {"thread_id": f"turn_{self.turn_counter}"}}
 
@@ -116,7 +138,7 @@ class CogniActAgent(BaseAgent):
 
         # Create initial state for the new thread
         initial_state = {
-            "history": history,
+            "messages": messages,
             "working_memory": current_working_memory,
             "response": "",
             "thinking": "",
@@ -127,9 +149,9 @@ class CogniActAgent(BaseAgent):
         final_state = self.workflow.invoke(initial_state, config=thread_config)
 
         # Update the main thread with the results for persistence
-        updated_history = history + [AIMessage(content=final_state["response"])]
+        updated_messages = messages + [AIMessage(content=final_state["response"])]
         self.workflow.update_state(main_thread_config, {
-            "history": updated_history,
+            "messages": updated_messages,
             "working_memory": final_state["working_memory"]
         })
 
@@ -142,7 +164,7 @@ class CogniActAgent(BaseAgent):
     def reset(self) -> None:
         thread_config = {"configurable": {"thread_id": "main_thread"}}
         # To reset, we update the state with an empty AgentState for that thread
-        empty_state = AgentState(history=[], working_memory="", response="", thinking="", diff="")
+        empty_state = AgentState(messages=[], working_memory="", response="", thinking="", diff="")
         self.workflow.update_state(thread_config, empty_state)
         print("Agent state has been reset.")
 
@@ -166,24 +188,24 @@ if __name__ == "__main__":
         exit()
 
     # --- Initialize Agent ---
-    agent = CogniActAgent(main_llm_provider=main_llm, distillation_llm_provider=distill_llm)
-    print("🤖 CogniAct Agent is ready. Type 'quit', 'exit', or 'q' to end.")
+    agent = ReaDisPatActAgent(main_llm_provider=main_llm, distillation_llm_provider=distill_llm)
+    print("🤖 ReaDisPatActAgent Agent is ready. Type 'quit', 'exit', or 'q' to end.")
 
     # --- Main Interaction Loop ---
-    history = []
+    messages = []
     while True:
         user_input = input("User > ")
         if user_input.lower() in ["quit", "exit", "q"]:
             print("Ending session.")
             break
         
-        history.append(HumanMessage(content=user_input))
+        messages.append(HumanMessage(content=user_input))
         
-        # Invoke the agent with the current history
-        output = agent.invoke(history)
+        # Invoke the agent with the current messages
+        output = agent.invoke(messages)
         
-        # Update history for the next turn
-        history.append(AIMessage(content=output["response"]))
+        # Update messages for the next turn
+        messages.append(AIMessage(content=output["response"]))
         
         print("\n---ANSWER---")
         print(f"AI: {output['response']}")

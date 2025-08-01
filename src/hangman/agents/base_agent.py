@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
-from typing_extensions import TypedDict
 
 from langchain_core.messages import BaseMessage
 from langgraph.graph import END, StateGraph
@@ -9,27 +8,7 @@ from langgraph.graph import END, StateGraph
 from hangman.providers.llmprovider import LLMProvider, ModelOutput
 
 
-# --- Agent State Definition ---
 
-class AgentState(TypedDict):
-    """
-    Represents the complete state of an agent at any point in time.
-    This structure is used by the LangGraph state machine.
-    """
-    # The public conversation history
-    history: List[BaseMessage]
-    
-    # The agent's private, internal knowledge and scratchpad
-    working_memory: Dict[str, Any]
-    
-    # The public-facing response for the current turn
-    response: str
-    
-    # The private thinking trace for the current turn
-    thinking: str
-
-    # The diff of changes made to the working memory
-    diff: str
 
 
 # --- Abstract Base Agent ---
@@ -63,15 +42,15 @@ class BaseAgent(ABC):
         pass
 
     @abstractmethod
-    def invoke(self, history: List[BaseMessage]) -> ModelOutput:
+    def invoke(self, messages: List[BaseMessage]) -> ModelOutput:
         """
         Runs the agent for a single turn.
 
         This is the primary entry point for interacting with the agent. It takes
-        the current conversation history and returns the model's output.
+        the current conversation messages and returns the model's output.
 
         Args:
-            history: The current public conversation history.
+            messages: The current public conversation messages.
 
         Returns:
             A ModelOutput dictionary containing the 'response' and 'thinking' trace.
@@ -79,15 +58,15 @@ class BaseAgent(ABC):
         pass
     
     @abstractmethod
-    def get_state(self) -> AgentState:
+    def get_state(self) -> Dict[str, Any]:
         """
         Retrieves the agent's current internal state.
         
         This is crucial for logging and evaluation, allowing inspection of the
-        agent's history and private working memory.
+        agent's messages and private working memory.
 
         Returns:
-            The current AgentState dictionary.
+            The current Agent's State dictionary.
         """
         pass
     

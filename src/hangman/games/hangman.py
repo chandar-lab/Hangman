@@ -47,14 +47,14 @@ class HangmanGame(BaseGame):
         """
         super().update_state(utterance, private_state)
 
-    def get_conversation_history(self) -> List[str]:
+    def get_conversation_messages(self) -> List[str]:
         """
-        Retrieves the public-facing conversation history.
+        Retrieves the public-facing conversation messages.
 
         Returns:
             A list of all utterances from the game log.
         """
-        return super().get_conversation_history()
+        return super().get_conversation_messages()
 
     def get_full_state(self) -> List[Tuple[str, Optional[str]]]:
         """

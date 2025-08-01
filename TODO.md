@@ -79,3 +79,7 @@ This list is prioritized to build the project from the ground up, ensuring a tes
 * **Automate Experimentation**: Write the main logic in `run_experiment.py`. This script should read the config, loop through all combinations of (agent, game, player mode), and run the required number of trials, saving all results. Consider adding parallel processing to speed up API calls.
 * **Analyze & Visualize**: Use the `analyze_results.ipynb` notebook to load the data from the `results/` folder, perform statistical analysis, and generate the plots and tables for your paper.
 * **Code Refinement**: Add `docstrings`, type hints, and unit tests to improve code quality and reproducibility.
+
+### Other
+* Change messages -> messages
+* add get_private_state method to all agents

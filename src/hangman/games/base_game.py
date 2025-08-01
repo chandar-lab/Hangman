@@ -13,7 +13,7 @@ class BaseGame(ABC):
 
     The determination of the game's status (e.g., in_progress, win, loss) is
     delegated to an external component, such as an "LLM Judge," which analyzes
-    the conversation history managed by this class.
+    the conversation messages managed by this class.
     """
 
     def __init__(self):
@@ -48,9 +48,9 @@ class BaseGame(ABC):
         self.interaction_log.append((utterance, private_state))
 
     @abstractmethod
-    def get_conversation_history(self) -> List[str]:
+    def get_conversation_messages(self) -> List[str]:
         """
-        Retrieves the public-facing conversation history.
+        Retrieves the public-facing conversation messages.
 
         Returns:
             A list of strings, where each string is an utterance from the log.

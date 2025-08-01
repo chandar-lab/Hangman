@@ -14,32 +14,32 @@ class LLMPlayer(BasePlayer):
     A concrete implementation of BasePlayer for an LLM-powered conversational
     partner. This player can adopt any role defined by a system prompt.
 
-    It maintains its own internal history of the conversation, which is
-    synchronized with the history provided by the GameLoopController during
+    It maintains its own internal messages of the conversation, which is
+    synchronized with the messages provided by the GameLoopController during
     the invoke call.
     """
 
     def __init__(self, llm_provider: LLMProvider, system_prompt: str = "You are a helpful assistant.") -> None:
         """
         Initializes the LLMPlayer with a configured LLM provider and an
-        empty internal history.
+        empty internal messages.
 
         Args:
             llm_provider: An initialized instance of LLMProvider.
         """
         super().__init__(llm_provider)
-        self.history: List[BaseMessage] = []
+        self.messages: List[BaseMessage] = []
         self.system_prompt = system_prompt
 
-    def invoke(self, history: List[BaseMessage], system_prompt: str) -> str:
+    def invoke(self, messages: List[BaseMessage], system_prompt: str) -> str:
         """
         Generates the player's next conversational turn by calling the LLM.
 
-        It uses the official history from the game loop for the API call to
-        ensure it is always in sync, and then updates its internal history.
+        It uses the official messages from the game loop for the API call to
+        ensure it is always in sync, and then updates its internal messages.
 
         Args:
-            history: The current public conversation history from the game loop.
+            messages: The current public conversation messages from the game loop.
             system_prompt: A string that defines the player's role.
 
         Returns:
@@ -47,29 +47,29 @@ class LLMPlayer(BasePlayer):
         """
         print("\n--- LLM PLAYER TURN ---")
         # The messages for the LLM call are constructed with the system prompt
-        # and the official history from the game loop.
+        # and the official messages from the game loop.
         if system_prompt:
             system_message = SystemMessage(content=system_prompt)
         else:
             system_message = SystemMessage(content=self.system_prompt)
 
-        messages = [system_message] + history
+        messages = [system_message] + messages
 
         # Invoke the LLM provider. This implementation doesn't need "thinking".
         model_output = self.llm_provider.invoke(messages, thinking=False)
         response_text = model_output["response"]
 
-        # Update its own internal history state for logging or debugging.
-        self.history = history + [AIMessage(content=response_text)]
+        # Update its own internal messages state for logging or debugging.
+        self.messages = messages + [AIMessage(content=response_text)]
 
         return response_text
 
     def reset(self) -> None:
         """
-        Resets the player's internal history to an empty list.
+        Resets the player's internal messages to an empty list.
         """
-        self.history = []
-        print("LLMPlayer state and history reset.")
+        self.messages = []
+        print("LLMPlayer state and messages reset.")
 
 
 # --- Runnable CLI for Direct Testing ---
@@ -102,8 +102,8 @@ if __name__ == "__main__":
         "You are a funny assistant"
     )
     
-    # The history list for the conversation.
-    history = []
+    # The messages list for the conversation.
+    messages = []
     
     print("\nLLM Player is ready.")
     print("Type 'quit', 'exit', or 'q' to end the session.")
@@ -116,18 +116,18 @@ if __name__ == "__main__":
             print("Ending session.")
             break
         
-        # Add user message to history
-        history.append(HumanMessage(content=user_input))
+        # Add user message to messages
+        messages.append(HumanMessage(content=user_input))
         
         # Get the player's response
         try:
-            player_response = player.invoke(history, test_system_prompt)
+            player_response = player.invoke(messages, test_system_prompt)
         except Exception as e:
             print(f"\n🚨 An error occurred during player invocation: {e}")
             print("Please ensure your LLM server (e.g., vLLM) is running.")
             break
             
-        # Add player's response to history for the next turn's context
-        history.append(AIMessage(content=player_response))
+        # Add player's response to messages for the next turn's context
+        messages.append(AIMessage(content=player_response))
 
         print(f"\nHost > {player_response}")

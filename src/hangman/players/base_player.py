@@ -15,7 +15,7 @@ class BasePlayer(ABC):
 
     This class represents a "role-player" (e.g., game host, collaborator)
     and is designed to be simpler than the BaseAgent. Its primary function
-    is to generate a conversational turn based on the history and a
+    is to generate a conversational turn based on the messages and a
     system prompt that defines its role.
     """
 
@@ -29,12 +29,12 @@ class BasePlayer(ABC):
         self.llm_provider = llm_provider
 
     @abstractmethod
-    def invoke(self, history: List[BaseMessage], system_prompt: str) -> str:
+    def invoke(self, messages: List[BaseMessage], system_prompt: str) -> str:
         """
         Generates the player's next conversational turn.
 
         Args:
-            history: The current public conversation history.
+            messages: The current public conversation messages.
             system_prompt: A string that defines the player's role and
                            instructions for the current game.
 

@@ -7,7 +7,7 @@ from typing import List, Dict, Any
 
 # --- Project-Specific Imports ---
 from hangman.agents.base_agent import BaseAgent
-from hangman.agents.cogniact import CogniActAgent
+from hangman.agents.readispatactagent import ReaDisPatActAgent
 from hangman.players.base_player import BasePlayer
 from hangman.games.base_game import BaseGame
 from hangman.games.hangman import HangmanGame
@@ -97,7 +97,7 @@ class GameLoopController:
         Checks if the game has reached a terminal state (Win/Loss).
 
         TODO: This method will be implemented using the 'judge_llm_provider'
-        to analyze the conversation history and determine the game's state.
+        to analyze the conversation messages and determine the game's state.
         For now, it relies solely on the max_turns limit.
         """
         # raise NotImplementedError("The LLM Judge logic has not been implemented yet.")
@@ -117,7 +117,7 @@ class GameLoopController:
 
         # 2. Prepare logging and initial state
         self._prepare_log_file()
-        history: List[BaseMessage] = []
+        messages: List[BaseMessage] = []
         turn_count = 0
         
         # Initial log before any turns
@@ -136,23 +136,23 @@ class GameLoopController:
 
             if current_actor_is_player:
                 print("Player's turn...")
-                player_utterance = self.player.invoke(history, system_prompt=self.game.player_start_prompt)
+                player_utterance = self.player.invoke(messages, system_prompt=self.game.player_start_prompt)
                 print(f"Player: {player_utterance}")
                 # The player acts as the 'user', so its message is a HumanMessage.
-                history.append(HumanMessage(content=player_utterance))
+                messages.append(HumanMessage(content=player_utterance))
                 self.game.update_state(utterance=player_utterance, private_state=None)
             else:
                 print("Agent's turn...")
                 # Assuming the agent needs a get_private_state() method
                 # This may raise an AttributeError if not implemented on the agent.
                 try:
-                    agent_output = self.agent.invoke(history)
+                    agent_output = self.agent.invoke(messages)
                     agent_utterance = agent_output["response"]
                     private_state_str = self.agent.get_private_state()
                     
                     print(f"Agent: {agent_utterance}")
                     # The agent is the 'AI', so its own message is an AIMessage.
-                    history.append(AIMessage(content=agent_utterance))
+                    messages.append(AIMessage(content=agent_utterance))
                     self.game.update_state(utterance=agent_utterance, private_state=private_state_str)
                 except Exception as e:
                     print(f"An error occurred during agent invocation: {e}")
@@ -209,13 +209,13 @@ if __name__ == "__main__":
     print("🚀 Instantiating components...")
     game = HangmanGame()
     player = LLMPlayer(llm_provider=player_llm)
-    agent = CogniActAgent(
+    agent = ReaDisPatActAgent(
         main_llm_provider=agent_main_llm,
         distillation_llm_provider=agent_distill_llm
     )
     
     # HACK: Add the get_private_state method to the agent instance for this test.
-    # In a final implementation, this should be a proper method on the BaseAgent or CogniActAgent class.
+    # In a final implementation, this should be a proper method on the BaseAgent or ReaDisPatActAgent class.
     def get_private_state_impl(self) -> str:
         state_values = self.get_state()
         # Format the working memory and last thought into a loggable string
@@ -224,7 +224,7 @@ if __name__ == "__main__":
         return f"---THINKING---\n{thought}\n\n---WORKING MEMORY---\n{memory}"
     
     # Bind the implementation to the agent instance
-    agent.get_private_state = get_private_state_impl.__get__(agent, CogniActAgent)
+    agent.get_private_state = get_private_state_impl.__get__(agent, ReaDisPatActAgent)
     print("✅ Components instantiated.")
     print("...Patched `get_private_state` method onto agent instance for logging.")
 

@@ -53,7 +53,11 @@ python -m vllm.entrypoints.openai.api_server \
 6. **Run the Agent (Terminal 2)**
 In a second terminal (with the venv still activated), run the agent script. You can now start chatting with the agent.
 ```Bash
-python src/hangman/agents/cogniact.py
+python src/hangman/agents/readispatactagent.py
+```
+or
+```bash
+python src/hangman/agents/readisoveactagent.py
 ```
 
 or make the agent interact with the player by
