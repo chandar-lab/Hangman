@@ -1,7 +1,6 @@
 import os
 import yaml
 from typing import List, Any, Dict
-from diff_match_patch import diff_match_patch
 
 # --- Core LangChain/LangGraph Imports ---
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
@@ -15,8 +14,8 @@ from typing_extensions import TypedDict
 from hangman.agents.base_agent import BaseAgent, ModelOutput
 # Import the unified LLM provider
 from hangman.providers.llmprovider import LLMProvider, load_llm_provider
-# Import prompts from a central location
-from hangman.prompts.readispatactagent import MAIN_SYSTEM_PROMPT, DISTILLATION_SYSTEM_PROMPT
+# Import prompts from the new central location for this agent
+from hangman.prompts.readisoveact_agent import MAIN_SYSTEM_PROMPT, DISTILLATION_SYSTEM_PROMPT
 
 # --- Agent State Definition ---
 
@@ -37,19 +36,15 @@ class AgentState(TypedDict):
     # The private thinking trace for the current turn
     thinking: str
 
-    # The diff of changes made to the working memory
-    diff: str
-
-class ReaDisPatActAgent(BaseAgent):
+class ReaDisOveActAgent(BaseAgent):
     """
-    An agent that uses a "think-distill-patch" cycle to maintain a
-    private working memory separate from its conversational messages.
+    An agent that uses a "Reason-Distill-Overwrite-Act" cycle.
+    It maintains a private working memory that is completely overwritten
+    after each turn based on a distillation of the recent interaction.
     """
     def __init__(self, main_llm_provider: LLMProvider, distillation_llm_provider: LLMProvider):
         self.distillation_llm_provider = distillation_llm_provider
-        # The parent class __init__ will call _build_workflow and assign it to self.workflow
         super().__init__(llm_provider=main_llm_provider)
-        # The self.workflow object now manages all state. No separate tracker is needed.
         self.turn_counter = 0
         self.reset()
 
@@ -57,15 +52,14 @@ class ReaDisPatActAgent(BaseAgent):
         """Constructs the agent's LangGraph workflow."""
         workflow = StateGraph(AgentState)
 
-        # Nodes are now methods of the class, giving them access to self.
+        # Define the nodes for the new workflow
         workflow.add_node("generate_response", self._generate_response)
-        workflow.add_node("generate_diff", self._generate_diff)
-        workflow.add_node("apply_diff", self._apply_diff)
+        workflow.add_node("distill_and_overwrite_memory", self._distill_and_overwrite_memory)
 
+        # Define the graph's structure
         workflow.set_entry_point("generate_response")
-        workflow.add_edge("generate_response", "generate_diff")
-        workflow.add_edge("generate_diff", "apply_diff")
-        workflow.add_edge("apply_diff", END)
+        workflow.add_edge("generate_response", "distill_and_overwrite_memory")
+        workflow.add_edge("distill_and_overwrite_memory", END)
 
         return workflow.compile(checkpointer=MemorySaver())
 
@@ -73,14 +67,12 @@ class ReaDisPatActAgent(BaseAgent):
     def _generate_response(self, state: AgentState) -> dict:
         """Generates a response using the main LLM provider."""
         print("---NODE: GENERATING RESPONSE---")
-        # Format the prompt with the current working memory
         prompt = ChatPromptTemplate.from_messages([
             ("system", MAIN_SYSTEM_PROMPT),
         ]).format(working_memory=state["working_memory"])
         
         messages = [SystemMessage(content=prompt)] + state["messages"]
         
-        # Use the main LLM provider passed during initialization
         result = self.llm_provider.invoke(messages, thinking=True)
         
         return {
@@ -88,9 +80,11 @@ class ReaDisPatActAgent(BaseAgent):
             "response": result["response"],
         }
 
-    def _generate_diff(self, state: AgentState) -> dict:
-        """Generates a diff to update the working memory."""
-        print("---NODE: GENERATING DIFF---")
+    def _distill_and_overwrite_memory(self, state: AgentState) -> dict:
+        """
+        Generates a new working memory from scratch and overwrites the old one.
+        """
+        print("---NODE: DISTILLING & OVERWRITING MEMORY---")
         messages_str = "\n".join([f"{msg.type}: {msg.content}" for msg in state["messages"]])
         
         prompt_str = DISTILLATION_SYSTEM_PROMPT.format(
@@ -100,28 +94,15 @@ class ReaDisPatActAgent(BaseAgent):
             response=state["response"],
         )
         
-        # Use the separate distillation LLM provider
+        # Use the distillation LLM to generate the *entire new* working memory
         result = self.distillation_llm_provider.invoke([HumanMessage(content=prompt_str)])
-        return {"diff": result["response"]}
-
-    def _apply_diff(self, state: AgentState) -> dict:
-        """Parses and applies a text patch to the working memory."""
-        print("---NODE: APPLYING DIFF---")
-        diff_text = state.get("diff", "").replace('```', "").strip()
-
-        if not diff_text:
-            return {}
-
-        dmp = diff_match_patch()
-        try:
-            patches = dmp.patch_fromText(diff_text)
-            new_memory, _ = dmp.patch_apply(patches, state["working_memory"])
-            print(f"\n--- WORKING MEMORY UPDATED ---")
-            print(new_memory)
-            return {"working_memory": new_memory}
-        except Exception as e:
-            print(f"Error applying patch: {e}")
-            return {}
+        
+        new_memory = result["response"]
+        print(f"\n--- WORKING MEMORY OVERWRITTEN ---")
+        print(new_memory)
+        
+        # Return the new memory to directly overwrite the key in the state
+        return {"working_memory": new_memory}
 
     # --- Method Implementations from BaseAgent ---
     def invoke(self, messages: List[BaseMessage]) -> ModelOutput:
@@ -136,16 +117,15 @@ class ReaDisPatActAgent(BaseAgent):
         except:
             current_working_memory = ""
 
-        # Create initial state for the new thread
+        # Create initial state for the new thread, without the 'diff' key
         initial_state = {
             "messages": messages,
             "working_memory": current_working_memory,
             "response": "",
             "thinking": "",
-            "diff": ""
         }
 
-        # Invoke the graph with the initial state - this will execute the full workflow
+        # Invoke the graph with the initial state
         final_state = self.workflow.invoke(initial_state, config=thread_config)
 
         # Update the main thread with the results for persistence
@@ -160,11 +140,18 @@ class ReaDisPatActAgent(BaseAgent):
     def get_state(self) -> AgentState:
         thread_config = {"configurable": {"thread_id": "main_thread"}}
         return self.workflow.get_state(config=thread_config).values
+    
+    def get_private_state(self) -> str:
+        state_values = self.get_state()
+        # Format the working memory and last thought into a loggable string
+        memory = state_values.get('working_memory', 'N/A')
+        thought = state_values.get('thinking', 'N/A')
+        return f"---THINKING---\n{thought}\n\n---WORKING MEMORY---\n{memory}"
 
     def reset(self) -> None:
         thread_config = {"configurable": {"thread_id": "main_thread"}}
-        # To reset, we update the state with an empty AgentState for that thread
-        empty_state = AgentState(messages=[], working_memory="", response="", thinking="", diff="")
+        # Update empty state to remove the 'diff' key
+        empty_state = AgentState(messages=[], working_memory="", response="", thinking="")
         self.workflow.update_state(thread_config, empty_state)
         print("Agent state has been reset.")
 
@@ -177,8 +164,6 @@ if __name__ == "__main__":
         config = yaml.safe_load(f)
 
     # --- Initialize Providers from Config ---
-    # This assumes you have providers named 'qwen_local' and 'kimi_k2_openrouter' in your config
-    # You can change these names to match your config file.
     try:
         main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local")
         distill_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local")
@@ -188,14 +173,14 @@ if __name__ == "__main__":
         exit()
 
     # --- Initialize Agent ---
-    agent = ReaDisPatActAgent(main_llm_provider=main_llm, distillation_llm_provider=distill_llm)
-    print("🤖 ReaDisPatActAgent Agent is ready. Type 'quit', 'exit', or 'q' to end.")
+    agent = ReaDisOveActAgent(main_llm_provider=main_llm, distillation_llm_provider=distill_llm)
+    print("🤖 ReaDisOveActAgent Agent is ready. Type 'quit', 'exit', or 'q' to end.")
 
     # --- Main Interaction Loop ---
     messages = []
     while True:
         user_input = input("User > ")
-        if user_input.lower() in ["quit", "exit", "q"]:
+        if user_input.lower() in ["quit", 'exit', 'q']:
             print("Ending session.")
             break
         

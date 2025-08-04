@@ -67,7 +67,7 @@ class LLMProvider:
         elif "<thinking>" in text:
             tag_word = "thinking"
         else:
-            logging.warning("No thinking tags found in the response. Treating as direct response.")
+            logging.warning(f"No thinking tags found in the response. Treating as direct response. The response is:\n--\n{text}\n--")
             return {"response": text, "thinking": ""}
         think_start_tag = f"<{tag_word}>"
         think_end_tag = f"</{tag_word}>"

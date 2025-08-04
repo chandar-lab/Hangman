@@ -47,7 +47,9 @@ python -m vllm.entrypoints.openai.api_server \
     --model Qwen/Qwen3-14B \
     --trust-remote-code \
     --port 8000 \
-    --dtype bfloat16
+    --dtype bfloat16 \ 
+    --enable-auto-tool-choice \
+    --tool-call-parser hermes
 ```
 
 6. **Run the Agent (Terminal 2)**

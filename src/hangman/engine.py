@@ -7,7 +7,7 @@ from typing import List, Dict, Any
 
 # --- Project-Specific Imports ---
 from hangman.agents.base_agent import BaseAgent
-from hangman.agents.readispatactagent import ReaDisPatActAgent
+from hangman.agents.readispatact_agentagent import ReaDisPatActAgent
 from hangman.players.base_player import BasePlayer
 from hangman.games.base_game import BaseGame
 from hangman.games.hangman import HangmanGame
@@ -178,10 +178,10 @@ if __name__ == "__main__":
 
     # Define the names of the LLM providers to use from the config file
     # NOTE: You may need to change these names to match your config.yaml
-    AGENT_MAIN_LLM = "qwen3_coder_openrouter"
-    AGENT_DISTILL_LLM = "qwen3_coder_openrouter"
-    PLAYER_LLM = "qwen3_coder_openrouter"
-    JUDGE_LLM = "qwen3_coder_openrouter" # A faster model is recommended for judging
+    AGENT_MAIN_LLM = "qwen3_14b_local"
+    AGENT_DISTILL_LLM = "qwen3_14b_local"
+    PLAYER_LLM = "qwen3_14b_local"
+    JUDGE_LLM = "qwen3_14b_local" 
 
     print("--- 🧪 Starting Test Run ---")
 
@@ -214,17 +214,6 @@ if __name__ == "__main__":
         distillation_llm_provider=agent_distill_llm
     )
     
-    # HACK: Add the get_private_state method to the agent instance for this test.
-    # In a final implementation, this should be a proper method on the BaseAgent or ReaDisPatActAgent class.
-    def get_private_state_impl(self) -> str:
-        state_values = self.get_state()
-        # Format the working memory and last thought into a loggable string
-        memory = state_values.get('working_memory', 'N/A')
-        thought = state_values.get('thinking', 'N/A')
-        return f"---THINKING---\n{thought}\n\n---WORKING MEMORY---\n{memory}"
-    
-    # Bind the implementation to the agent instance
-    agent.get_private_state = get_private_state_impl.__get__(agent, ReaDisPatActAgent)
     print("✅ Components instantiated.")
     print("...Patched `get_private_state` method onto agent instance for logging.")
 

@@ -69,6 +69,19 @@ class BaseAgent(ABC):
             The current Agent's State dictionary.
         """
         pass
+
+    @abstractmethod
+    def get_private_state(self) -> str:
+        """
+        Retrieves the agent's current internal state and returns it as a string to be passed to the Engine.
+        
+        This is crucial for logging and evaluation, allowing inspection of the
+        agent's messages and private working memory.
+
+        Returns:
+            The current Agent's Private State as a string.
+        """
+        pass
     
     @abstractmethod
     def reset(self) -> None:

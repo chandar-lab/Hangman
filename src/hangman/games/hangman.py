@@ -1,9 +1,11 @@
 from typing import List, Tuple, Optional
 
 # --- Project-Specific Imports ---
-from hangman.games.base_game import BaseGame
-from hangman.prompts.hangman import AGENT_START_PROMPT, PLAYER_START_PROMPT
+# Import the abstract base class for games.
+from hangman.agents.base_game import BaseGame
 
+# Import the game-specific prompts. This file is expected to exist.
+from hangman.prompts.hangman import AGENT_START_PROMPT, PLAYER_START_PROMPT
 
 class HangmanGame(BaseGame):
     """
@@ -47,14 +49,14 @@ class HangmanGame(BaseGame):
         """
         super().update_state(utterance, private_state)
 
-    def get_conversation_messages(self) -> List[str]:
+    def get_conversation_history(self) -> List[str]:
         """
-        Retrieves the public-facing conversation messages.
+        Retrieves the public-facing conversation history.
 
         Returns:
             A list of all utterances from the game log.
         """
-        return super().get_conversation_messages()
+        return super().get_conversation_history()
 
     def get_full_state(self) -> List[Tuple[str, Optional[str]]]:
         """
