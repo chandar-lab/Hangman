@@ -7,7 +7,7 @@ from typing import List, Dict, Any
 
 # --- Project-Specific Imports ---
 from hangman.agents.base_agent import BaseAgent
-from hangman.agents.readispatact_agentagent import ReaDisPatActAgent
+from hangman.agents.readispatact_agent import ReaDisPatActAgent
 from hangman.players.base_player import BasePlayer
 from hangman.games.base_game import BaseGame
 from hangman.games.hangman import HangmanGame

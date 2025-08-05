@@ -41,7 +41,29 @@ poetry add [package_name]
 ```
 
 5. **Serve the Language Model (Terminal 1)**
-In your first terminal, start the vLLM server. This command will download the specified model and serve it at http://localhost:8000. Leave this terminal running.
+The command to start the vLLM server depends on which agent you intend to test. Choose one of the two options below.
+
+**For Standard Agents (No Tool-Calling)**
+
+Use this command when running experiments with the following agents. These agents rely on generating a reasoning trace within `<think>` tags.
+
+* `ReaDisPatActAgent`
+* `ReaDisOveActAgent`
+* `ReaDisUpdActAgent`
+* `ReaKeeActAgent`
+
+```bash
+python -m vllm.entrypoints.openai.api_server \
+    --model Qwen/Qwen3-14B \
+    --trust-remote-code \
+    --port 8000 \
+    --dtype bfloat16  
+```
+
+**For the ReactAgent Agents (Tool-Calling Enabled)**
+
+When testing the `ReActAgent`
+
 ```bash
 python -m vllm.entrypoints.openai.api_server \
     --model Qwen/Qwen3-14B \
@@ -59,7 +81,7 @@ python src/hangman/agents/readispatactagent.py
 ```
 or
 ```bash
-python src/hangman/agents/readisoveactagent.py
+python src/hangman/agents/react.py
 ```
 
 or make the agent interact with the player by

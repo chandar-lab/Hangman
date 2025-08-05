@@ -53,15 +53,26 @@ class LLMPlayer(BasePlayer):
         else:
             system_message = SystemMessage(content=self.system_prompt)
 
-        messages = [system_message] + messages
+        # 1. Create a temporary list for the role-reversed conversation
+        reversed_role_messages = []
+        for msg in messages:
+            if isinstance(msg, HumanMessage):
+                # The Agent's message (Human) becomes the assistant's message
+                reversed_role_messages.append(AIMessage(content=msg.content))
+            elif isinstance(msg, AIMessage):
+                # The Player's own past messages (AI) become the user's messages
+                reversed_role_messages.append(HumanMessage(content=msg.content))
+            else:
+                # Keep other message types (like SystemMessage) as they are
+                reversed_role_messages.append(msg)
 
-        # Invoke the LLM provider. This implementation doesn't need "thinking".
-        model_output = self.llm_provider.invoke(messages, thinking=False)
+        # 2. Construct the final prompt for the LLM with the transformed history
+        llm_payload = [system_message] + reversed_role_messages
+
+        # 3. Invoke the LLM provider
+        model_output = self.llm_provider.invoke(llm_payload, thinking=False)
         response_text = model_output["response"]
-
-        # Update its own internal messages state for logging or debugging.
-        self.messages = messages + [AIMessage(content=response_text)]
-
+        
         return response_text
 
     def reset(self) -> None:
@@ -117,7 +128,7 @@ if __name__ == "__main__":
             break
         
         # Add user message to messages
-        messages.append(HumanMessage(content=user_input))
+        messages.append(AIMessage(content=user_input))
         
         # Get the player's response
         try:
@@ -128,6 +139,6 @@ if __name__ == "__main__":
             break
             
         # Add player's response to messages for the next turn's context
-        messages.append(AIMessage(content=player_response))
+        messages.append(HumanMessage(content=player_response))
 
         print(f"\nHost > {player_response}")

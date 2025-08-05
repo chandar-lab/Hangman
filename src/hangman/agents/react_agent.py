@@ -59,11 +59,12 @@ def update_memory(deletions: List[int], insertions: List[str], current_memory: s
 # --- Agent State and Class Definition ---
 
 class AgentState(TypedDict):
-    """The state for the ReactAgent."""
+    """The state for the ReActAgent."""
     messages: Annotated[Sequence[BaseMessage], add_messages]
+    thinking: str
     working_memory: str
 
-class ReactAgent(BaseAgent):
+class ReActAgent(BaseAgent):
     """
     An agent that uses the ReAct (Reason+Act) paradigm.
     Its only tool is the ability to edit its own working memory.
@@ -111,10 +112,16 @@ class ReactAgent(BaseAgent):
         print("---NODE: AGENT---")
         # Format the system prompt with the current working memory
         system_prompt = SystemMessage(content=MAIN_SYSTEM_PROMPT.format(working_memory=state["working_memory"]))
-        
         messages = [system_prompt] + state["messages"]
-        response = self.model.invoke(messages)
-        return {"messages": [response], "working_memory": state["working_memory"]}
+
+        response_obj = self.model.invoke(messages)
+        parsed_output = self.llm_provider.parse_response(response_obj.content or "")
+        response_obj.content = parsed_output["response"]
+        return {
+            "messages": [response_obj],
+            "working_memory": state["working_memory"],
+            "thinking": parsed_output["thinking"]
+        }
         
     def _tool_node(self, state: AgentState) -> Dict[str, Any]:
         """Executes tools and updates state."""
@@ -208,9 +215,12 @@ class ReactAgent(BaseAgent):
                 final_response = msg.content
                 break
         
-        # tool_trace = [msg.pretty_repr() for msg in final_state["messages"] if isinstance(msg, (AIMessage, ToolMessage))]
+        # 5. Create a comprehensive thinking trace
+        explicit_thinking = final_state.get("thinking", "")
+        tool_trace = [msg.pretty_repr() for msg in final_state["messages"] if isinstance(msg, (AIMessage, ToolMessage))]
+        full_thinking_trace = f"---Explicit Thought---\n{explicit_thinking}\n\n---Tool Trace---\n" + "\n".join(tool_trace)
         
-        return {"response": final_response}# , "thinking": "\n".join(tool_trace)}
+        return {"response": final_response, "thinking": full_thinking_trace}
 
     def get_state(self) -> Dict[str, Any]:
         """
@@ -248,8 +258,8 @@ if __name__ == "__main__":
         print(f"❌ Failed to load LLM Provider: {e}")
         exit()
 
-    agent = ReactAgent(main_llm_provider=main_llm)
-    print("🤖 ReactAgent is ready. Type 'quit', 'exit', or 'q' to end.")
+    agent = ReActAgent(main_llm_provider=main_llm)
+    print("🤖 ReActAgent is ready. Type 'quit', 'exit', or 'q' to end.")
 
     messages = []
     while True:
@@ -267,4 +277,8 @@ if __name__ == "__main__":
         print("\n---ANSWER---")
         print(f"AI: {output['response']}")
         print(agent.get_private_state())
+        # Print thinking trace if available
+        if "thinking" in output and output["thinking"]:
+            print("\n---THINKING TRACE---")
+            print(output["thinking"])
         print("\n" + "="*50 + "\n")

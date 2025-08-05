@@ -85,6 +85,20 @@ class LLMProvider:
     def _parse_direct_response(self, text: str) -> ModelOutput:
         """Handles models that give a direct response with no thinking."""
         return {"response": text, "thinking": ""}
+    
+    def parse_response(self, full_response_text: str) -> ModelOutput:
+        """
+        NEW: Public method to parse a raw text response into a ModelOutput,
+        extracting <think> tags based on the provider's configuration.
+        """
+        parsing_format = self.config.get("parsing_format", "direct_response")
+        if parsing_format == "think_tags":
+            return self._parse_with_think_tags(full_response_text)
+        elif parsing_format == "direct_response":
+            return self._parse_direct_response(full_response_text)
+        else:
+            logging.warning(f"Unsupported parsing format '{parsing_format}'. Defaulting to direct response.")
+            return self._parse_direct_response(full_response_text)
 
     def invoke(self, messages: List[BaseMessage], thinking: bool = False) -> ModelOutput:
         """
@@ -96,23 +110,15 @@ class LLMProvider:
         except Exception as e:
             logging.error(f"An error occurred while calling the model server: {e}")
             return {"response": "Error: Could not connect to the model server.", "thinking": ""}
-
-        # Dispatch to the correct parser based on the config
-        parsing_format = self.config.get("parsing_format", "direct_response")
-
-        if parsing_format == "think_tags":
-            parsed_output = self._parse_with_think_tags(full_response_text)
-            # If thinking was not requested, clear the thinking trace
-            if not thinking:
-                parsed_output["thinking"] = ""
-            return parsed_output
         
-        elif parsing_format == "direct_response":
-            return self._parse_direct_response(full_response_text)
+        # Parse the response based on the provider's configuration
+        parsed_output = self.parse_response(full_response_text)
+
+        # If thinking was not requested, clear the thinking trace from the final output
+        if not thinking:
+            parsed_output["thinking"] = ""
             
-        else:
-            logging.warning(f"Unsupported parsing format '{parsing_format}'. Defaulting to direct response.")
-            return self._parse_direct_response(full_response_text)
+        return parsed_output
 
 
 # --- Helper/Factory Function ---
