@@ -1,11 +1,9 @@
 import os
 import yaml
-import json
 from typing import List, Any, Dict, Sequence, Annotated
 
 # --- Core LangChain/LangGraph Imports ---
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
-# from langchain_core.tools import tool
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
@@ -14,29 +12,40 @@ from typing_extensions import TypedDict
 # --- Project-Specific Imports ---
 from hangman.agents.base_agent import BaseAgent, ModelOutput
 from hangman.providers.llmprovider import LLMProvider, load_llm_provider
-
-from hangman.tools.update_memory import update_memory
-from hangman.prompts.react_agent import MAIN_SYSTEM_PROMPT
+# --- Import the tools and the new prompt ---
+from hangman.tools import update_memory, get_search_tool
+from hangman.prompts.reactwebsearch_agent import MAIN_SYSTEM_PROMPT
 
 # --- Agent State and Class Definition ---
 
 class AgentState(TypedDict):
-    """The state for the ReActAgent."""
+    """The state for the ReActWebSearchAgent."""
     messages: Annotated[Sequence[BaseMessage], add_messages]
     thinking: str
     working_memory: str
 
-class ReActAgent(BaseAgent):
+class ReActWebSearchAgent(BaseAgent):
     """
-    An agent that uses the ReAct (Reason+Act) paradigm.
-    Its only tool is the ability to edit its own working memory.
+    An agent that uses the ReAct paradigm with two tools:
+    1. update_memory: to manage an internal scratchpad.
+    2. web_search: to find up-to-date information online.
     """
-    def __init__(self, main_llm_provider: LLMProvider):
-        # This agent only needs one LLM.
-        self.tools = [update_memory]
+    def __init__(self, main_llm_provider: LLMProvider, search_provider: str = "duckduckgo"):
+        """
+        Initializes the agent.
+
+        Args:
+            main_llm_provider: The primary LLM provider.
+            search_provider: The search backend ('tavily' or 'duckduckgo'). Defaults to 'duckduckgo'.
+        """
+        # 1. Instantiate the search tool using our factory
+        web_search_tool = get_search_tool(provider=search_provider)
+
+        # 2. Assemble the list of available tools
+        self.tools = [update_memory, web_search_tool]
         self.tools_by_name = {t.name: t for t in self.tools}
         
-        # Bind the tools to the LLM
+        # 3. Bind the tools to the LLM
         self.model = main_llm_provider.client.bind_tools(self.tools)
 
         super().__init__(llm_provider=main_llm_provider)
@@ -63,7 +72,7 @@ class ReActAgent(BaseAgent):
 
     # --- Graph Nodes and Logic ---
 
-    def _should_continue(self, state: AgentState):
+    def _should_continue(self, state: AgentState) -> str:
         """Determines whether to continue with a tool call or end."""
         if not state["messages"][-1].tool_calls:
             return "end"
@@ -72,37 +81,70 @@ class ReActAgent(BaseAgent):
     def _call_model(self, state: AgentState) -> Dict[str, Any]:
         """Invokes the LLM with the current state to decide on an action or response."""
         print("---NODE: AGENT---")
-        # Format the system prompt with the current working memory
+        # Format the system prompt with the current working memory, using the new prompt
         system_prompt = SystemMessage(content=MAIN_SYSTEM_PROMPT.format(working_memory=state["working_memory"]))
         messages = [system_prompt] + state["messages"]
 
         response_obj = self.model.invoke(messages)
+        # We assume the LLM provider can parse out thinking/response content if structured
         parsed_output = self.llm_provider.parse_response(response_obj.content or "")
         response_obj.content = parsed_output["response"]
+        
         return {
             "messages": [response_obj],
-            "working_memory": state["working_memory"],
             "thinking": parsed_output["thinking"]
+            # working_memory is not modified in this node
         }
         
     def _tool_node(self, state: AgentState) -> Dict[str, Any]:
-        """Executes tools and updates state."""
+        """
+        Executes the called tool and returns the result. This node is now generic
+        and handles each tool's specific side effects.
+        """
         tool_call = state["messages"][-1].tool_calls[0]
         tool = self.tools_by_name[tool_call["name"]]
-        
-        # The `update_memory` tool needs the current memory to modify it
         tool_args = tool_call["args"]
-        tool_args["current_memory"] = state["working_memory"]
 
-        new_memory = tool.invoke(tool_args)
+        print(f"---NODE: TOOL ({tool.name})---")
+
+        if tool.name == "update_memory":
+            # This tool has a side effect: it modifies working_memory.
+            # We must inject the current memory state into its arguments.
+            tool_args["current_memory"] = state["working_memory"]
+            result = tool.invoke(tool_args)
+            
+            tool_message = ToolMessage(
+                content=f"Successfully updated working memory.", # A confirmation message
+                name=tool_call["name"],
+                tool_call_id=tool_call["id"],
+            )
+            # Return the updated memory AND the tool message
+            return {"working_memory": result, "messages": [tool_message]}
+
+        elif tool.name == "web_search":
+            # This tool is pure; it takes a query and returns a result.
+            # It does not modify the working_memory directly.
+            result = tool.invoke(tool_args)
+            
+            tool_message = ToolMessage(
+                content=result, # The content is the actual search result
+                name=tool_call["name"],
+                tool_call_id=tool_call["id"],
+            )
+            # Only return the tool message. The agent must use update_memory
+            # in a subsequent step if it wants to save the search results.
+            return {"messages": [tool_message]}
         
-        tool_message = ToolMessage(
-            content=f"Successfully updated working memory.",
-            name=tool_call["name"],
-            tool_call_id=tool_call["id"],
-        )
-        # Update both working memory and add the tool result message
-        return {"working_memory": new_memory, "messages": [tool_message]}
+        else:
+            # Fallback for any other tools
+            result = tool.invoke(tool_args)
+            tool_message = ToolMessage(
+                content=str(result),
+                name=tool_call["name"],
+                tool_call_id=tool_call["id"],
+            )
+            return {"messages": [tool_message]}
+
 
     def invoke(self, messages: List[BaseMessage]) -> ModelOutput:
         """
@@ -110,38 +152,31 @@ class ReActAgent(BaseAgent):
         isolation, while persisting the working_memory in the 'main_thread'.
         """
         self.turn_counter += 1
-        # Create a temporary, unique thread for this specific turn's execution
-        turn_thread_config = {"configurable": {"thread_id": f"react_turn_{self.turn_counter}"}}
+        turn_thread_config = {"configurable": {"thread_id": f"react_web_search_turn_{self.turn_counter}"}}
         main_thread_config = {"configurable": {"thread_id": "main_thread"}}
         
-        # 1. Get the last known working memory from the persistent main thread
         try:
-            current_state = self.get_state() # Gets state from "main_thread"
+            current_state = self.get_state()
             current_working_memory = current_state.get("working_memory", "")
         except Exception:
             current_working_memory = ""
         
-        # 2. Invoke the graph in the temporary thread.
-        #    This prevents state conflicts between complex ReAct loops.
         final_state = self.workflow.invoke(
             {"messages": messages, "working_memory": current_working_memory}, 
             config=turn_thread_config
         )
         
-        # 3. Explicitly save the updated working memory back to the main thread for the next turn.
         self.workflow.update_state(
             main_thread_config,
             {"working_memory": final_state["working_memory"], "messages": final_state["messages"]}
         )
         
-        # 4. Extract the final response for the user
         final_response = ""
         for msg in reversed(final_state["messages"]):
             if isinstance(msg, AIMessage) and not msg.tool_calls:
                 final_response = msg.content
                 break
         
-        # 5. Create a comprehensive thinking trace
         explicit_thinking = final_state.get("thinking", "")
         tool_trace = [msg.pretty_repr() for msg in final_state["messages"] if isinstance(msg, (AIMessage, ToolMessage))]
         full_thinking_trace = f"---Explicit Thought---\n{explicit_thinking}\n\n---Tool Trace---\n" + "\n".join(tool_trace)
@@ -149,15 +184,9 @@ class ReActAgent(BaseAgent):
         return {"response": final_response, "thinking": full_thinking_trace}
 
     def get_state(self) -> Dict[str, Any]:
-        """
-        Retrieves the latest state snapshot for the main thread and returns
-        the actual state dictionary from its .values attribute.
-        """
+        """Retrieves the latest state snapshot from the main thread."""
         snapshot = self.workflow.get_state({"configurable": {"thread_id": "main_thread"}})
-        # The state dictionary is stored in the .values attribute of the snapshot
-        if snapshot:
-            return snapshot.values
-        return {} # Return an empty dict if no state exists
+        return snapshot.values if snapshot else {}
 
     def get_private_state(self) -> str:
         state = self.get_state()
@@ -166,9 +195,9 @@ class ReActAgent(BaseAgent):
 
     def reset(self) -> None:
         """Resets the agent by clearing the main thread's state."""
-        empty_state = AgentState(messages=[], working_memory="")
+        empty_state = AgentState(messages=[], working_memory="", thinking="")
         self.workflow.update_state({"configurable": {"thread_id": "main_thread"}}, empty_state)
-        print("ReactAgent state has been reset.")
+        print("ReActWebSearchAgent state has been reset.")
 
 
 # --- Runnable CLI for Direct Testing ---
@@ -184,8 +213,10 @@ if __name__ == "__main__":
         print(f"❌ Failed to load LLM Provider: {e}")
         exit()
 
-    agent = ReActAgent(main_llm_provider=main_llm)
-    print("🤖 ReActAgent is ready. Type 'quit', 'exit', or 'q' to end.")
+    # Instantiate the new agent
+    agent = ReActWebSearchAgent(main_llm_provider=main_llm, search_provider="duckduckgo")
+    print("🤖 ReActWebSearchAgent is ready. Type 'quit', 'exit', or 'q' to end.")
+    print("Try asking about a recent event, e.g., 'Who won the last Super Bowl?'")
 
     messages = []
     while True:
@@ -198,12 +229,14 @@ if __name__ == "__main__":
         
         output = agent.invoke(messages)
         
+        # The agent's final response might be in the AIMessage, so we add it.
+        # Note: The agent's internal message history is managed by LangGraph's checkpointer.
+        # This local 'messages' list is just for the CLI conversation flow.
         messages.append(AIMessage(content=output["response"]))
         
         print("\n---ANSWER---")
         print(f"AI: {output['response']}")
         print(agent.get_private_state())
-        # Print thinking trace if available
         if "thinking" in output and output["thinking"]:
             print("\n---THINKING TRACE---")
             print(output["thinking"])

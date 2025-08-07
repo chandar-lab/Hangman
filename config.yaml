@@ -1,8 +1,6 @@
 # -------------------------
 # LLM Provider Configurations
 # -------------------------
-# A list of all available LLM configurations. The `run_experiment.py` script
-# can select one of these by its `name`.
 
 providers:
   - name: "qwen3_14b_local"
@@ -70,22 +68,3 @@ providers:
     generation_config:
       temperature: 0.3
       max_tokens: 4096
-
-# -------------------------
-# Experiment Settings
-# -------------------------
-# Global parameters for running the experimental suite.
-
-experiment_settings:
-  num_runs_per_task: 50
-  max_turns_per_game: 20
-  results_dir: "./results"
-
-# -------------------------
-# Evaluation Settings
-# -------------------------
-# Configuration for the Judge LLM that evaluates the results.
-
-evaluation:
-  # Select which provider config to use for the Judge LLM
-  judge_provider_name: "anthropic_sonnet_3.5"

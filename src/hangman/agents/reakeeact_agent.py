@@ -156,7 +156,7 @@ class ReaKeeActAgent(BaseAgent):
         state_values = self.get_state()
         memory = state_values.get('working_memory', 'N/A')
         # thought = state_values.get('thinking', 'N/A') ## TODO: This does not work
-        return f"--- WORKING MEMORY---\n{memory}"
+        return memory
 
     def reset(self) -> None:
         thread_config = {"configurable": {"thread_id": "main_thread"}}

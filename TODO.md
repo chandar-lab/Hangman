@@ -81,5 +81,11 @@ This list is prioritized to build the project from the ground up, ensuring a tes
 * **Code Refinement**: Add `docstrings`, type hints, and unit tests to improve code quality and reproducibility.
 
 ### Other
-* Change messages -> messages
-* add get_private_state method to all agents
+* Check if OpenRouter models work with tools
+* Implement evaluation of Games with LLM Judge
+* Implement Benchmarking on GAIA / HLE / AIME
+* `is_game_over()` method  
+* Maybe implement tests
+* Make run_experiment.py configurable from `config.yaml`
+* ✅ Change messages -> messages
+* ✅ add get_private_state method to all agents

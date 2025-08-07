@@ -3,10 +3,6 @@ import os
 import yaml
 from tqdm import tqdm
 
-# --- Path Setup ---
-# This allows the script to be run from the project root and find the 'src' module
-# sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
-
 # --- Project-Specific Imports ---
 from hangman.providers.llmprovider import LLMProvider, load_llm_provider
 from hangman.games.hangman import HangmanGame
@@ -15,34 +11,7 @@ from hangman.engine import GameLoopController
 from hangman.agents.base_agent import BaseAgent
 
 # Import all agent classes to be tested
-from hangman.agents.react_agent import ReActAgent
-from hangman.agents.readisoveact_agent import ReaDisOveActAgent
-from hangman.agents.readispatact_agent import ReaDisPatActAgent
-from hangman.agents.readisupdact_agent import ReaDisUpdActAgent
-from hangman.agents.reakeeact_agent import ReaKeeActAgent
-
-# --- Agent Factory ---
-
-def create_agent(
-    agent_name: str,
-    main_llm: LLMProvider,
-    distill_llm: LLMProvider
-) -> BaseAgent:
-    """Factory function to create an agent instance by name."""
-    if agent_name == "ReActAgent":
-        # This agent only requires the main LLM
-        return ReActAgent(main_llm_provider=main_llm)
-    elif agent_name == "ReaKeeActAgent":
-        # This agent only requires the main LLM
-        return ReaKeeActAgent(main_llm_provider=main_llm)
-    elif agent_name == "ReaDisPatActAgent":
-        return ReaDisPatActAgent(main_llm_provider=main_llm, distillation_llm_provider=distill_llm)
-    elif agent_name == "ReaDisOveActAgent":
-        return ReaDisOveActAgent(main_llm_provider=main_llm, distillation_llm_provider=distill_llm)
-    elif agent_name == "ReaDisUpdActAgent":
-        return ReaDisUpdActAgent(main_llm_provider=main_llm, distillation_llm_provider=distill_llm)
-    else:
-        raise ValueError(f"Unknown agent name: {agent_name}")
+from hangman.agents import create_agent
 
 # --- Main Experiment Runner ---
 
@@ -57,7 +26,7 @@ def run_experiments():
     MAX_TURNS = 20
     
     AGENTS_TO_TEST = [
-        # "ReActAgent",
+        "ReActAgent",
         "ReaKeeActAgent",
         "ReaDisOveActAgent",
         "ReaDisPatActAgent",
@@ -88,9 +57,23 @@ def run_experiments():
         
         # Create a dedicated results directory for this agent
         agent_results_dir = os.path.join(BASE_RESULTS_DIR, agent_name)
+        os.makedirs(agent_results_dir, exist_ok=True)
+
+        # --- RESUMABILITY LOGIC ---
+        try:
+            completed_trials = len([f for f in os.listdir(agent_results_dir) if f.endswith('.json')])
+        except FileNotFoundError:
+            completed_trials = 0
+
+        if completed_trials >= NUM_TRIALS:
+            print(f"✅ Agent {agent_name} already has {completed_trials} trials completed. Skipping.")
+            continue
+        
+        print(f"▶️  Found {completed_trials} existing trials. Starting from trial {completed_trials + 1}.")
         
         # Use tqdm for a progress bar over the trials
-        for i in tqdm(range(NUM_TRIALS), desc=f"Agent: {agent_name}", unit="trial"):
+        needed_trials = NUM_TRIALS - completed_trials
+        for i in tqdm(range(needed_trials), desc=f"Agent: {agent_name}", unit="trial"):
             try:
                 # 3. Instantiate fresh components for each trial
                 agent = create_agent(agent_name, main_llm, distill_llm)
@@ -114,9 +97,11 @@ def run_experiments():
                 error_log_path = os.path.join(agent_results_dir, "error_log.txt")
                 with open(error_log_path, "a") as f:
                     f.write(f"Timestamp: {datetime.now().isoformat()}\n")
-                    f.write(f"Trial: {i+1}\nAgent: {agent_name}\n")
+                    f.write(f"Trial: {completed_trials+i+1}\nAgent: {agent_name}\n")
                     f.write(f"Error: {e}\n---\n")
                 continue
+
+
 
     print(f"\n{'='*30} ✅ All Experiments Finished {'='*30}")
     print(f"Results saved in: {BASE_RESULTS_DIR}")
@@ -124,3 +109,5 @@ def run_experiments():
 if __name__ == "__main__":
     from datetime import datetime
     run_experiments()
+
+

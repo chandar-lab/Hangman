@@ -41,35 +41,14 @@ poetry add [package_name]
 ```
 
 5. **Serve the Language Model (Terminal 1)**
-The command to start the vLLM server depends on which agent you intend to test. Choose one of the two options below.
-
-**For Standard Agents (No Tool-Calling)**
-
-Use this command when running experiments with the following agents. These agents rely on generating a reasoning trace within `<think>` tags.
-
-* `ReaDisPatActAgent`
-* `ReaDisOveActAgent`
-* `ReaDisUpdActAgent`
-* `ReaKeeActAgent`
+The command to start the vLLM server with `Qwen3-14B` is the following:
 
 ```bash
 python -m vllm.entrypoints.openai.api_server \
     --model Qwen/Qwen3-14B \
     --trust-remote-code \
     --port 8000 \
-    --dtype bfloat16  
-```
-
-**For the ReactAgent Agents (Tool-Calling Enabled)**
-
-When testing the `ReActAgent`
-
-```bash
-python -m vllm.entrypoints.openai.api_server \
-    --model Qwen/Qwen3-14B \
-    --trust-remote-code \
-    --port 8000 \
-    --dtype bfloat16 \ 
+    --dtype bfloat16 \
     --enable-auto-tool-choice \
     --tool-call-parser hermes
 ```

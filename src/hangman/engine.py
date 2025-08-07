@@ -60,12 +60,11 @@ class GameLoopController:
 
     def _prepare_log_file(self) -> None:
         """Creates the results directory and defines a unique log file path."""
-        game_results_dir = os.path.join(self.results_dir, self.game.name)
-        os.makedirs(game_results_dir, exist_ok=True)
+        os.makedirs(self.results_dir, exist_ok=True)
 
         timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         agent_name = self.agent.__class__.__name__
-        self.log_filepath = os.path.join(game_results_dir, f"{agent_name}_{timestamp}.json")
+        self.log_filepath = os.path.join(self.results_dir, f"{agent_name}_{timestamp}.json")
         print(f"Logging results to: {self.log_filepath}")
 
     def _write_log(self, status: str) -> None:
