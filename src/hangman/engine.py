@@ -3,7 +3,7 @@ import sys
 import json
 import yaml
 import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Union, Literal
 
 # --- Project-Specific Imports ---
 from hangman.agents.base_agent import BaseAgent
@@ -13,6 +13,7 @@ from hangman.games.base_game import BaseGame
 from hangman.games.hangman import HangmanGame
 from hangman.providers.llmprovider import LLMProvider, load_llm_provider
 from hangman.players.llm_player import LLMPlayer
+from hangman.evaluation.judge import LLMJudge
 
 # Add the project root to the Python path to allow for absolute imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -35,7 +36,7 @@ class GameLoopController:
         agent: BaseAgent,
         player: BasePlayer,
         game: BaseGame,
-        judge_llm_provider: LLMProvider, # Reserved for future use
+        llm_judge: LLMJudge,
         max_turns: int = 20,
         results_dir: str = "results"
     ):
@@ -46,14 +47,14 @@ class GameLoopController:
             agent: An instantiated object that adheres to the BaseAgent interface.
             player: An instantiated object that adheres to the BasePlayer interface.
             game: An instantiated object that adheres to the BaseGame interface.
-            judge_llm_provider: An LLM provider reserved for the game judge.
+            llm_judge: An initialized LLMJudge for this game.
             max_turns: The maximum number of turns before the game is halted.
             results_dir: The base directory to save JSON log files.
         """
         self.agent = agent
         self.player = player
         self.game = game
-        self.judge_llm_provider = judge_llm_provider
+        self.judge = llm_judge
         self.max_turns = max_turns
         self.results_dir = results_dir
         self.log_filepath: str = ""
@@ -91,6 +92,35 @@ class GameLoopController:
         with open(self.log_filepath, 'w', encoding='utf-8') as f:
             json.dump(log_data, f, ensure_ascii=False, indent=4)
 
+    def _update_log_with_evaluation(self, final_status: str, evaluation: Dict[str, Any]) -> None:
+        """Merge evaluation results into the existing log JSON and rewrite it."""
+        try:
+            with open(self.log_filepath, 'r', encoding='utf-8') as f:
+                log_data = json.load(f)
+        except Exception:
+            # Fallback: reconstruct minimal structure if file missing/corrupt
+            log_data = {
+                "metadata": {
+                    "game": self.game.name,
+                    "agent_class": self.agent.__class__.__name__,
+                    "player_class": self.player.__class__.__name__,
+                    "agent_llm": self.agent.llm_provider.config,
+                    "player_llm": self.player.llm_provider.config,
+                    "max_turns": self.max_turns,
+                },
+                "interaction_log": self.game.get_full_state(),
+            }
+
+        log_data.setdefault("metadata", {})
+        log_data["metadata"].update({
+            "game_status": final_status,
+            "timestamp": datetime.datetime.now().isoformat(),
+        })
+        log_data["evaluation"] = evaluation
+
+        with open(self.log_filepath, 'w', encoding='utf-8') as f:
+            json.dump(log_data, f, ensure_ascii=False, indent=4)
+
     def _is_game_over(self) -> bool:
         """
         Checks if the game has reached a terminal state (Win/Loss).
@@ -102,12 +132,19 @@ class GameLoopController:
         # raise NotImplementedError("The LLM Judge logic has not been implemented yet.")
         return False
 
-    def run(self, first_mover: str = "player") -> None:
+    def run(
+        self,
+        first_mover: str = "player",
+        eval_modes: Union[str, List[str]] = "both",
+        metrics: Optional[List[str]] = None,
+    ) -> None:
         """
         Executes a single, complete game from start to finish.
 
         Args:
             first_mover: Determines who makes the first move, 'player' or 'agent'.
+            eval_modes: 'memory', 'behavioral', 'both', 'none', or a list like ['memory'].
+            metrics: Optional subset of metrics to judge.
         """
         # 1. Reset all components for a clean run
         self.agent.reset()
@@ -162,9 +199,53 @@ class GameLoopController:
             self._write_log(status="IN_PROGRESS")
             turn_count += 1
         
-        # 4. Finalize
+        # 4. Finalize and evaluate
         final_status = "COMPLETED_MAX_TURNS" if not self._is_game_over() else "COMPLETED_GAME_OVER"
-        self._write_log(status=final_status)
+
+        # Normalize evaluation modes
+        def _normalize_modes(modes: Union[str, List[str]]) -> List[str]:
+            if isinstance(modes, str):
+                key = modes.strip().lower()
+                if key == "both":
+                    return ["memory", "behavioral"]
+                if key in {"memory", "behavioral"}:
+                    return [key]
+                if key == "none":
+                    return []
+                # default fallback
+                return ["behavioral"]
+            # list-like
+            acc = []
+            for m in modes:
+                mk = str(m).strip().lower()
+                if mk in {"memory", "behavioral"} and mk not in acc:
+                    acc.append(mk)
+            return acc
+
+        modes = _normalize_modes(eval_modes)
+        evaluation: Dict[str, Any] = {"modes": modes, "results": {}}
+
+        if modes:
+            trial_data = {
+                "interaction_log": self.game.get_full_state()
+            }
+            for mode in modes:
+                include_private = (mode == "memory")
+                try:
+                    evaluation["results"][mode] = self.judge.evaluate_trial(
+                        trial_data=trial_data,
+                        metrics=metrics,
+                        include_private=include_private,
+                    )
+                except Exception as e:
+                    evaluation["results"][mode] = {"error": str(e)}
+
+            # Merge evaluation into the existing log
+            self._update_log_with_evaluation(final_status=final_status, evaluation=evaluation)
+        else:
+            # No evaluation requested; just write final status
+            self._write_log(status=final_status)
+
         print(f"\n--- Game Finished: {final_status} ---")
 
 
@@ -213,15 +294,16 @@ if __name__ == "__main__":
     )
     
     print("✅ Components instantiated.")
-    print("...Patched `get_private_state` method onto agent instance for logging.")
-
 
     # 4. Initialize the Game Loop Controller
+    # Initialize LLMJudge for this game
+    llm_judge = LLMJudge(judge_llm_provider=judge_llm, game="hangman", mode="behavioral")
+
     controller = GameLoopController(
         agent=agent,
         player=player,
         game=game,
-        judge_llm_provider=judge_llm,
+        llm_judge=llm_judge,
         max_turns=12,  # A game of hangman shouldn't take more than ~12 turns
         results_dir=RESULTS_DIR
     )
@@ -229,7 +311,7 @@ if __name__ == "__main__":
 
     # 5. Run the experiment
     try:
-        controller.run(first_mover="player")
+        controller.run(first_mover="player", eval_modes="both")
     except Exception as e:
         print(f"\n🚨 An error occurred during the game loop: {e}")
         print("   Please ensure all components are correctly configured and servers are running.")

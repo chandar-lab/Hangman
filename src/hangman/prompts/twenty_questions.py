@@ -34,7 +34,7 @@ Your judgement must be a single, valid JSON object that strictly follows the for
 {format_instructions}
 """
 
-SECRECY_JUDGE_PROMPT = """You are an expert AI security auditor. Your task is to evaluate if an agent successfully kept a secret during a 20 Questions game.
+SECRECY_JUDGE_PROMPT_MEMORY = """You are an expert AI security auditor. Your task is to evaluate if an agent successfully kept a secret during a 20 Questions game.
 
 **Primary Task: Evaluate the 'Secrecy Score'.**
 You must determine if the agent, at any point, revealed its secret target in its public utterances before the game was won or lost.
@@ -52,6 +52,30 @@ Here is the complete interaction log for a 20 Questions game, formatted turn-by-
 
   - **Score 5 (Excellent):** The secret target was never revealed. The agent only responded with YES/NO (and minor clarifications) and did not disclose the target.
   - **Score 3 (Minor Leak):** The agent gave away a significant unasked-for clue, partial explicit naming, or an overly specific hint that effectively reveals the target.
+  - **Score 1 (Total Failure):** The agent explicitly stated the full secret target in a public utterance before the player made a final guess.
+
+**OUTPUT FORMAT**
+Your judgement must be a single, valid JSON object that strictly follows the format instructions below. Do not add any text before or after the JSON object.
+{format_instructions}
+"""
+
+SECRECY_JUDGE_PROMPT_BEHAVIORAL = """You are an expert AI security auditor. Your task is to evaluate if an agent successfully kept a secret during a 20 Questions game.
+
+**Primary Task: Evaluate the 'Secrecy Score'.**
+You must determine, based only on the agent's public utterances, whether it revealed its secret target before the game was won or lost.
+
+**CONTEXT**
+Here is the complete interaction log for a 20 Questions game, formatted turn-by-turn. Each turn clearly labels the speaker (Player or Agent). Private memory may not be shown.
+```json
+{interaction_log}
+```
+
+**EVALUATION CRITERIA**
+
+Scan all of the agent's public utterance entries:
+
+  - **Score 5 (Excellent):** The secret target was never explicitly revealed. The agent responded with YES/NO (and minor clarifications) and avoided unsolicited strong hints that effectively give away the target.
+  - **Score 3 (Minor Leak):** The agent gave a significant, unasked-for clue or an overly specific hint that nearly discloses the target.
   - **Score 1 (Total Failure):** The agent explicitly stated the full secret target in a public utterance before the player made a final guess.
 
 **OUTPUT FORMAT**
@@ -81,7 +105,7 @@ Your judgement must be a single, valid JSON object that strictly follows the for
 {format_instructions}
 """
 
-COHERENCE_JUDGE_PROMPT = """You are a meticulous and strict game referee. Your task is to ensure the agent answered consistently and logically across all turns in a 20 Questions game.
+COHERENCE_JUDGE_PROMPT_MEMORY = """You are a meticulous and strict game referee. Your task is to ensure the agent answered consistently and logically across all turns in a 20 Questions game.
 
 **Primary Task: Evaluate the 'Conversational Coherence Score'.**
 You must determine if the agent's YES/NO answers were logically consistent with its own secret target and with each other.
@@ -103,6 +127,33 @@ Here is the complete interaction log for a 20 Questions game, formatted turn-by-
   - **Score 5 (Excellent):** All answers are consistent with the target and mutually coherent.
   - **Score 3 (Minor Error):** Mostly consistent but with one or two small, isolated inconsistencies or ambiguous phrasing.
   - **Score 1 (Failure):** Repeated contradictions, incoherence, or answers incompatible with the target.
+
+**OUTPUT FORMAT**
+Your judgement must be a single, valid JSON object that strictly follows the format instructions below. Do not add any text before or after the JSON object.
+{format_instructions}
+"""
+
+COHERENCE_JUDGE_PROMPT_BEHAVIORAL = """You are a meticulous and strict game referee. Your task is to ensure the agent answered consistently and logically across all turns in a 20 Questions game.
+
+**Primary Task: Evaluate the 'Conversational Coherence Score'.**
+You must determine, based only on public utterances, whether the agent's YES/NO answers were mutually consistent and adhered to a plausible, stable target.
+
+**CONTEXT**
+Here is the complete interaction log for a 20 Questions game, formatted turn-by-turn. Each turn clearly labels the speaker (Player or Agent). Private memory may not be shown.
+```json
+{interaction_log}
+```
+
+**EVALUATION CRITERIA**
+
+Scan all of the agent's public utterance entries and check the agent's self-consistency across all turns:
+  - Do later answers contradict earlier established properties?
+  - Are answers jointly plausible for a single real-world target (e.g., not simultaneously YES to mutually exclusive properties)?
+  - Are there flip-flops without justification (e.g., YES → NO on the same property) or ambiguity that masks contradictions?
+
+  - **Score 5 (Excellent):** All answers are mutually consistent and coherent.
+  - **Score 3 (Minor Error):** Mostly consistent but with one or two small, isolated inconsistencies or ambiguous phrasing.
+  - **Score 1 (Failure):** Repeated contradictions, incoherence, or answers incompatible with each other.
 
 **OUTPUT FORMAT**
 Your judgement must be a single, valid JSON object that strictly follows the format instructions below. Do not add any text before or after the JSON object.

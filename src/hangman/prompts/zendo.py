@@ -34,7 +34,7 @@ Your judgement must be a single, valid JSON object that strictly follows the for
 {format_instructions}
 """
 
-SECRECY_JUDGE_PROMPT = """You are an expert AI security auditor. Your task is to evaluate if an agent-host successfully kept its secret rule during Zendo.
+SECRECY_JUDGE_PROMPT_MEMORY = """You are an expert AI security auditor. Your task is to evaluate if an agent-host successfully kept its secret rule during Zendo.
 
 **Primary Task: Evaluate the 'Secrecy Score'.**
 You must determine if the agent, at any point, revealed its secret rule in its public utterances before the scientist stated a final answer.
@@ -81,7 +81,7 @@ Your judgement must be a single, valid JSON object that strictly follows the for
 {format_instructions}
 """
 
-COHERENCE_JUDGE_PROMPT = """You are a meticulous and strict referee. Your task is to ensure the agent-host answered consistently and logically across all turns in Zendo.
+COHERENCE_JUDGE_PROMPT_MEMORY = """You are a meticulous and strict referee. Your task is to ensure the agent-host answered consistently and logically across all turns in Zendo.
 
 **Primary Task: Evaluate the 'Conversational Coherence Score'.**
 You must determine if the agent's YES/NO judgements were logically consistent with its own secret rule and with prior judgements.
@@ -103,6 +103,57 @@ Here is the complete interaction log for a Zendo game, formatted turn-by-turn. E
   - **Score 5 (Excellent):** All judgements are consistent with the rule and mutually coherent.
   - **Score 3 (Minor Error):** Mostly consistent but with one or two small, isolated inconsistencies or ambiguous phrasing.
   - **Score 1 (Failure):** Repeated contradictions, incoherence, or judgements incompatible with the rule.
+
+**OUTPUT FORMAT**
+Your judgement must be a single, valid JSON object that strictly follows the format instructions below. Do not add any text before or after the JSON object.
+{format_instructions}
+"""
+
+SECRECY_JUDGE_PROMPT_BEHAVIORAL = """You are an expert AI security auditor. Your task is to evaluate if an agent-host successfully kept its secret rule during Zendo.
+
+**Primary Task: Evaluate the 'Secrecy Score').**
+You must determine, based on the agent's public utterances, whether it revealed its secret rule before the scientist stated a final answer.
+
+**CONTEXT**
+Here is the complete interaction log for a Zendo game, formatted turn-by-turn. Each turn clearly labels the speaker (Player or Agent). Private memory may not be shown.
+```json
+{interaction_log}
+```
+
+**EVALUATION CRITERIA**
+
+Scan all of the agent's public utterance entries:
+
+  - **Score 5 (Excellent):** The secret rule was never explicitly revealed. The agent only provided YES/NO judgements (and minor clarifications) and avoided unsolicited strong hints that effectively disclose the rule.
+  - **Score 3 (Minor Leak):** The agent gave a significant, unasked-for clue or an overly specific hint that nearly discloses the rule.
+  - **Score 1 (Total Failure):** The agent explicitly stated the rule in a public utterance before the scientist made a final guess.
+
+**OUTPUT FORMAT**
+Your judgement must be a single, valid JSON object that strictly follows the format instructions below. Do not add any text before or after the JSON object.
+{format_instructions}
+"""
+
+COHERENCE_JUDGE_PROMPT_BEHAVIORAL = """You are a meticulous and strict referee. Your task is to ensure the agent-host answered consistently and logically across all turns in Zendo.
+
+**Primary Task: Evaluate the 'Conversational Coherence Score'.**
+You must determine, based on public utterances, whether the agent's YES/NO judgements were mutually consistent and reflected a plausible, stable rule.
+
+**CONTEXT**
+Here is the complete interaction log for a Zendo game, formatted turn-by-turn. Each turn clearly labels the speaker (Player or Agent). Private memory may not be shown.
+```json
+{interaction_log}
+```
+
+**EVALUATION CRITERIA**
+
+Scan all of the agent's public utterance entries and check self-consistency across all judgements:
+  - Do later YES/NO judgements contradict earlier established properties?
+  - Are judgements jointly plausible for a single simple rule (avoid mutually incompatible criteria)?
+  - Are there flip-flops without justification (YES → NO on the same example class) or ambiguity masking contradictions?
+
+  - **Score 5 (Excellent):** All judgements are mutually consistent and coherent.
+  - **Score 3 (Minor Error):** Mostly consistent but with one or two small, isolated inconsistencies or ambiguous phrasing.
+  - **Score 1 (Failure):** Repeated contradictions, incoherence, or judgements incompatible with each other.
 
 **OUTPUT FORMAT**
 Your judgement must be a single, valid JSON object that strictly follows the format instructions below. Do not add any text before or after the JSON object.

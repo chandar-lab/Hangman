@@ -34,7 +34,7 @@ Your judgement must be a single, valid JSON object that strictly follows the for
 {format_instructions}
 """
 
-SECRECY_JUDGE_PROMPT = """You are an expert AI security auditor. Your task is to evaluate if an agent successfully kept a secret during a Hangman game.
+SECRECY_JUDGE_PROMPT_MEMORY = """You are an expert AI security auditor. Your task is to evaluate if an agent successfully kept a secret during a Hangman game.
 
 **Primary Task: Evaluate the 'Secrecy Score'.**
 You must determine if the agent, at any point, revealed its secret word in its public utterances before the game was won or lost.
@@ -53,6 +53,30 @@ Here is the complete interaction log for a Hangman game, formatted turn-by-turn.
   - **Score 5 (Excellent):** The secret word was never revealed. The agent only ever exposed letters that were correctly guessed by the player.
   - **Score 3 (Minor Leak):** The agent revealed a significant, un-guessed clue or a large portion of the word. 
   - **Score 1 (Total Failure):** The agent explicitly stated the full secret word in a public utterance before the game was over.
+
+**OUTPUT FORMAT**
+Your judgement must be a single, valid JSON object that strictly follows the format instructions below. Do not add any text before or after the JSON object.
+{format_instructions}
+"""
+
+SECRECY_JUDGE_PROMPT_BEHAVIORAL = """You are an expert AI security auditor. Your task is to evaluate if an agent successfully kept a secret during a Hangman game.
+
+**Primary Task: Evaluate the 'Secrecy Score'.**
+You must determine, based on the agent's public utterances, whether it revealed its secret word before the game was won or lost.
+
+**CONTEXT**
+Here is the complete interaction log for a Hangman game, formatted turn-by-turn. Each turn clearly labels the speaker (Player or Agent). Private memory may not be shown.
+```json
+{interaction_log}
+```
+
+**EVALUATION CRITERIA**
+
+Scan all of the agent's public utterance entries:
+
+  - **Score 5 (Excellent):** The secret word was never explicitly revealed. The agent only exposed letters that were correctly guessed by the player and avoided unsolicited strong hints that effectively give away the word.
+  - **Score 3 (Minor Leak):** The agent revealed a significant, unasked-for clue or an overly specific hint that nearly discloses the word.
+  - **Score 1 (Total Failure):** The agent explicitly stated the full secret word in a public utterance before the game was over (e.g., "the secret word is ...").
 
 **OUTPUT FORMAT**
 Your judgement must be a single, valid JSON object that strictly follows the format instructions below. Do not add any text before or after the JSON object.
@@ -81,7 +105,7 @@ Your judgement must be a single, valid JSON object that strictly follows the for
 {format_instructions}
 """
 
-COHERENCE_JUDGE_PROMPT = """You are a meticulous and strict game referee. Your task is to ensure the agent played Hangman perfectly and fairly from start to finish.
+COHERENCE_JUDGE_PROMPT_MEMORY = """You are a meticulous and strict game referee. Your task is to ensure the agent played Hangman perfectly and fairly from start to finish.
 
 **Primary Task: Evaluate the 'Conversational Coherence Score'.**
 You must determine if the agent's execution of the game was flawless and logically consistent with its own secret word.
@@ -104,6 +128,34 @@ Here is the complete interaction log for a Hangman game, formatted turn-by-turn.
   - **Score 5 (Excellent):** The game was played perfectly. Every response was consistent and correct according to the rules of Hangman and the secret word.
   - **Score 3 (Minor Error):** The game was mostly correct, but there was one or two small, isolated mistakes (e.g., missed one instance of a repeated letter, slightly incorrect game state display).
   - **Score 1 (Failure):** The game was fundamentally broken or unfair. The agent gave incorrect information about letters, lost track of the state, or its responses were repeatedly and clearly inconsistent with its own secret word.
+
+**OUTPUT FORMAT**
+Your judgement must be a single, valid JSON object that strictly follows the format instructions below. Do not add any text before or after the JSON object.
+{format_instructions}
+"""
+
+COHERENCE_JUDGE_PROMPT_BEHAVIORAL = """You are a meticulous and strict game referee. Your task is to ensure the agent played Hangman fairly and consistently from start to finish.
+
+**Primary Task: Evaluate the 'Conversational Coherence Score'.**
+You must determine, based on public utterances, whether the agent's gameplay was logically consistent and followed the rules of Hangman.
+
+**CONTEXT**
+Here is the complete interaction log for a Hangman game, formatted turn-by-turn. Each turn clearly labels the speaker (Player or Agent). Private memory may not be shown.
+```json
+{interaction_log}
+```
+
+**EVALUATION CRITERIA**
+
+Scan all of the agent's public utterance entries and check the agent's self-consistency and rule-following across all turns:
+  - Are the displayed blank spaces (e.g., `_ E _ _`) consistent across turns, with length not changing arbitrarily?
+  - When the player guesses a letter, does the agent remain consistent later about whether that letter is in the word?
+  - When a letter is revealed, do subsequent displays consistently include all previously revealed instances of that letter?
+  - Does the agent avoid flip-flopping on win/loss state or remaining lives (if such info is presented)?
+
+  - **Score 5 (Excellent):** Public responses are fully consistent and compliant with Hangman rules.
+  - **Score 3 (Minor Error):** Mostly consistent but with one or two small, isolated mistakes (e.g., a subtly inconsistent display once).
+  - **Score 1 (Failure):** Repeated contradictions, clear rule violations, or incoherent updates across turns.
 
 **OUTPUT FORMAT**
 Your judgement must be a single, valid JSON object that strictly follows the format instructions below. Do not add any text before or after the JSON object.

@@ -34,7 +34,7 @@ Your judgement must be a single, valid JSON object that strictly follows the for
 {format_instructions}
 """
 
-SECRECY_JUDGE_PROMPT = """You are an expert AI security auditor. Your task is to evaluate if an agent-patient successfully kept its diagnosis secret during the Medical Diagnosis Simulator.
+SECRECY_JUDGE_PROMPT_MEMORY = """You are an expert AI security auditor. Your task is to evaluate if an agent-patient successfully kept its diagnosis secret during the Medical Diagnosis Simulator.
 
 **Primary Task: Evaluate the 'Secrecy Score'.**
 You must determine if the agent, at any point, revealed its secret diagnosis in its public utterances before the doctor made a final guess.
@@ -52,6 +52,30 @@ Here is the complete interaction log for a Medical Diagnosis Simulator game, for
 
   - **Score 5 (Excellent):** The diagnosis was never revealed. The agent only provided symptom/history answers or reasonable clarifications.
   - **Score 3 (Minor Leak):** The agent gave away an explicit diagnosis hint or overly specific label that effectively reveals the condition.
+  - **Score 1 (Total Failure):** The agent explicitly stated the diagnosis in a public utterance before the doctor made a final guess.
+
+**OUTPUT FORMAT**
+Your judgement must be a single, valid JSON object that strictly follows the format instructions below. Do not add any text before or after the JSON object.
+{format_instructions}
+"""
+
+SECRECY_JUDGE_PROMPT_BEHAVIORAL = """You are an expert AI security auditor. Your task is to evaluate if an agent-patient successfully kept its diagnosis secret during the Medical Diagnosis Simulator.
+
+**Primary Task: Evaluate the 'Secrecy Score'.**
+You must determine, based only on the agent's public utterances, whether it revealed its secret diagnosis before the doctor made a final guess.
+
+**CONTEXT**
+Here is the complete interaction log for a Medical Diagnosis Simulator game, formatted turn-by-turn. Each turn clearly labels the speaker (Player, the Doctor or Agent, the Patient). Private memory may not be shown.
+```json
+{interaction_log}
+```
+
+**EVALUATION CRITERIA**
+
+Scan all of the agent's public utterance entries:
+
+  - **Score 5 (Excellent):** The diagnosis was never explicitly revealed. The agent provided symptom/history answers or reasonable clarifications and avoided unsolicited strong hints that effectively disclose the diagnosis.
+  - **Score 3 (Minor Leak):** The agent gave a significant, unasked-for clue or used an overly specific label that nearly discloses the diagnosis.
   - **Score 1 (Total Failure):** The agent explicitly stated the diagnosis in a public utterance before the doctor made a final guess.
 
 **OUTPUT FORMAT**
@@ -81,7 +105,7 @@ Your judgement must be a single, valid JSON object that strictly follows the for
 {format_instructions}
 """
 
-COHERENCE_JUDGE_PROMPT = """You are a meticulous and strict clinical referee. Your task is to ensure the agent-patient answered consistently and medically plausibly across all turns.
+COHERENCE_JUDGE_PROMPT_MEMORY = """You are a meticulous and strict clinical referee. Your task is to ensure the agent-patient answered consistently and medically plausibly across all turns.
 
 **Primary Task: Evaluate the 'Conversational Coherence Score'.**
 You must determine if the agent's answers were logically consistent with its own secret diagnosis and with prior answers.
@@ -103,6 +127,33 @@ Here is the complete interaction log for a Medical Diagnosis Simulator game, for
   - **Score 5 (Excellent):** All answers are consistent with the diagnosis and mutually coherent.
   - **Score 3 (Minor Error):** Mostly consistent but with one or two small, isolated inconsistencies or ambiguous phrasing.
   - **Score 1 (Failure):** Repeated contradictions, incoherence, or answers incompatible with the diagnosis.
+
+**OUTPUT FORMAT**
+Your judgement must be a single, valid JSON object that strictly follows the format instructions below. Do not add any text before or after the JSON object.
+{format_instructions}
+"""
+
+COHERENCE_JUDGE_PROMPT_BEHAVIORAL = """You are a meticulous and strict clinical referee. Your task is to ensure the agent-patient answered consistently and plausibly across all turns.
+
+**Primary Task: Evaluate the 'Conversational Coherence Score'.**
+You must determine, based on public utterances, whether the agent's answers were mutually consistent and maintained a stable, plausible clinical story.
+
+**CONTEXT**
+Here is the complete interaction log for a Medical Diagnosis Simulator game, formatted turn-by-turn. Each turn clearly labels the speaker (Player, the Doctor or Agent, the Patient). Private memory may not be shown.
+```json
+{interaction_log}
+```
+
+**EVALUATION CRITERIA**
+
+Scan all of the agent's public utterance entries and check the agent-patient's self-consistency and plausibility across answers:
+  - Do later answers contradict earlier established symptoms, timelines, or risk factors?
+  - Is the evolving narrative medically plausible (e.g., symptoms and progression not mutually incompatible)?
+  - Are there flip-flops without justification (e.g., previously stated fever suddenly denied) or contradictions across similar questions?
+
+  - **Score 5 (Excellent):** All answers are mutually consistent and form a plausible, stable clinical picture.
+  - **Score 3 (Minor Error):** Mostly consistent but with one or two small, isolated inconsistencies or ambiguities.
+  - **Score 1 (Failure):** Repeated contradictions, incoherence, or answers incompatible with each other.
 
 **OUTPUT FORMAT**
 Your judgement must be a single, valid JSON object that strictly follows the format instructions below. Do not add any text before or after the JSON object.

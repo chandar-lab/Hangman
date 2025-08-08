@@ -1,26 +1,14 @@
 import logging
 import json
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Literal
 
-# --- Pydantic and LangChain Imports for Structured Output ---
 from pydantic import BaseModel, Field, field_validator
 from langchain_core.output_parsers import PydanticOutputParser
-from langchain_core.messages import HumanMessage
-
-# --- Project-Specific Imports ---
 from hangman.providers.llmprovider import LLMProvider
-from hangman.prompts.hangman import (
-    INTENTIONALITY_JUDGE_PROMPT,
-    SECRECY_JUDGE_PROMPT,
-    MECHANISM_JUDGE_PROMPT,
-    COHERENCE_JUDGE_PROMPT,
-    FORMAT_INSTRUCTIONS,
-)
+from hangman.evaluation.prompt_registry import get_prompts
 
 # --- Setup Logging ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# --- Pydantic Model for Structured LLM Output ---
 
 class MetricEvaluation(BaseModel):
     """
@@ -44,149 +32,179 @@ class MetricEvaluation(BaseModel):
             raise ValueError('Confidence must be between 0 and 100')
         return v
 
-
-# --- Core Evaluator Class ---
-
-class HangmanJudge:
+class LLMJudge:
     """
-    An LLM-based evaluator that assesses game logs from Hangman experiments.
+    A generic, prompt-driven LLM judge for any supported game.
 
-    It uses a powerful "judge" LLM to score agent performance across several
-    qualitative metrics, providing structured, evidence-based feedback.
+    - No Pydantic. Parses the model JSON directly with best-effort robustness.
+    - Selects prompts via a (game, mode) registry.
     """
 
-    def __init__(self, judge_llm_provider: LLMProvider):
-        """
-        Initializes the HangmanJudge.
-
-        Args:
-            judge_llm_provider: An instantiated LLMProvider.
-        """
+    def __init__(
+        self,
+        judge_llm_provider: LLMProvider,
+        game: str,
+        mode: Literal["behavioral", "memory"] = "behavioral",
+    ) -> None:
         if not isinstance(judge_llm_provider, LLMProvider):
             raise TypeError("judge_llm_provider must be an instance of LLMProvider.")
 
         self.llm = judge_llm_provider
+        self.game = game
+        self.mode = mode
         self.parser = PydanticOutputParser(pydantic_object=MetricEvaluation)
-        self.format_instructions = FORMAT_INSTRUCTIONS
-        logging.info(f"HangmanJudge initialized with model: {self.llm.config.get('model_name')}")
+        # Do not prefetch prompts here; resolve per-call so include_private can remap mode
+        logging.info(
+            f"LLMJudge initialized for game='{self.game}', mode='{self.mode}', model={self.llm.config.get('model_name')}"
+        )
 
-    def _format_log_for_prompt(self, log_segment: List[List[Any]]) -> str:
+    def _format_log_for_prompt(self, log_segment: List[List[Any]], include_private: bool) -> str:
         """
-        Formats the interaction log into a human-readable, turn-by-turn string.
-
-        Args:
-            log_segment: A list of [utterance, private_state] pairs.
-
-        Returns:
-            A formatted string representing the conversation history.
+        Formats the interaction log into a readable, turn-by-turn string.
+        Each turn is [utterance, private_state]. TODO: It strongly assumes that the first mover is the player, make it modular. 
         """
-        formatted_parts = []
+        formatted_parts: List[str] = []
         for i, turn_data in enumerate(log_segment):
             turn_number = i + 1
-            utterance, private_state = turn_data
-            
-            # Player is always on even indices (0, 2, 4...)
+            # Defensive: tolerate ill-formed items
+            utterance = turn_data[0] if isinstance(turn_data, (list, tuple)) and len(turn_data) > 0 else ""
+            private_state = turn_data[1] if isinstance(turn_data, (list, tuple)) and len(turn_data) > 1 else ""
+
             if i % 2 == 0:
                 actor = "Player"
                 formatted_parts.append(f"--- TURN {turn_number} ({actor}) ---")
                 formatted_parts.append("PLAYER UTTERANCE:")
-                formatted_parts.append(utterance)
-            # Agent is always on odd indices (1, 3, 5...)
+                formatted_parts.append(str(utterance))
             else:
                 actor = "Agent"
                 formatted_parts.append(f"--- TURN {turn_number} ({actor}) ---")
                 formatted_parts.append("AGENT UTTERANCE:")
-                formatted_parts.append(utterance)
-                if private_state:
+                formatted_parts.append(str(utterance))
+                if include_private and private_state:
                     formatted_parts.append("\nAGENT'S PRIVATE MEMORY:")
-                    formatted_parts.append(private_state)
-            
-            formatted_parts.append("") # Add a blank line for spacing
-        
+                    formatted_parts.append(str(private_state))
+
+            formatted_parts.append("")
+
         return "\n".join(formatted_parts)
 
-    def _evaluate_metric(self, prompt_template: str, log_segment: List[List[Any]]) -> Dict[str, Any]:
-        """
-        A generic internal method to evaluate a single metric.
-
-        Args:
-            prompt_template: The string template for the specific metric's prompt.
-            log_segment: The relevant portion of the interaction log for this metric.
-
-        Returns:
-            A dictionary corresponding to the MetricEvaluation model, or an error dict.
-        """
+    def _extract_json(self, text: str) -> Dict[str, Any]:
+        """Best-effort JSON extraction from a model response string."""
+        # Try direct
         try:
-            # Format the log segment into a readable string for the prompt
-            formatted_log = json.dumps(log_segment, indent=2)
-            formatted_log = self._format_log_for_prompt(log_segment)
+            return json.loads(text)
+        except Exception:
+            pass
 
-            # Create the final prompt with the log and formatting instructions
-            prompt = prompt_template.format(
-                interaction_log=formatted_log,
-                format_instructions=self.format_instructions
-            )
+        # Try to find the first {...} block
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            snippet = text[start : end + 1]
+            try:
+                return json.loads(snippet)
+            except Exception:
+                pass
 
-            message = HumanMessage(content=prompt)
-            response = self.llm.invoke([message])
-            llm_output_str = response['response']
-            parsed_dict = json.loads(llm_output_str)
-            validated_data = MetricEvaluation(**parsed_dict)
+        # Fallback
+        return {
+            "score": -1,
+            "reasoning": "Judge output was not valid JSON.",
+            "confidence": 0,
+        }
 
-            return validated_data.model_dump()
-
+    def _evaluate_metric(
+        self,
+        prompt_template: str,
+        log_segment: List[List[Any]],
+        include_private: bool,
+        format_instructions: str,
+    ) -> Dict[str, Any]:
+        formatted_log = self._format_log_for_prompt(log_segment, include_private=include_private)
+        prompt = prompt_template.format(
+            interaction_log=formatted_log, format_instructions=format_instructions
+        )
+        try:
+            # Send raw prompt string to the provider
+            response = self.llm.invoke([prompt])
+            llm_output_str = response.get("response", "")
         except Exception as e:
-            logging.error(f"Failed to evaluate metric. Error: {e}")
-            logging.error(f"Prompt sent to LLM:\n{prompt[:1000]}...") # Log first 1k chars of prompt
-            # Return a default error structure
+            logging.error(f"Judge model invocation failed: {e}")
             return {
                 "score": -1,
-                "reasoning": f"Failed to parse LLM output or an API error occurred: {str(e)}",
+                "reasoning": f"Invocation error: {e}",
                 "confidence": 0,
             }
 
-    def evaluate_trial(self, trial_data: Dict[str, Any]) -> Dict[str, Any]:
+        parsed = self._extract_json(llm_output_str)
+        validated_data = MetricEvaluation(**parsed)
+        return validated_data.model_dump()
+
+    def evaluate_trial(
+        self,
+        trial_data: Dict[str, Any],
+        metrics: Optional[List[str]] = None,
+        include_private: Optional[bool] = None,
+        extra_context: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
-        Orchestrates the full evaluation for a single experiment trial.
+        Evaluate the given trial JSON using the selected (game, mode) prompts.
 
-        Args:
-            trial_data: The dictionary loaded from a single JSON result file.
-
-        Returns:
-            A dictionary containing the evaluation results for all metrics.
+        metrics: subset of [intentionality, secrecy, mechanism, coherence]. If None, evaluate all.
+        include_private: overrides whether to include agent private memory in the prompt log.
+        extra_context: reserved for future use (prepend to prompt if needed).
         """
         if "interaction_log" not in trial_data:
             raise ValueError("Trial data must contain an 'interaction_log' key.")
 
-        full_log = trial_data["interaction_log"]
-        
-        logging.info("Evaluating 'Intentionality'...")
-        intentionality_eval = self._evaluate_metric(
-            prompt_template=INTENTIONALITY_JUDGE_PROMPT,
-            log_segment=full_log[:2]  # Only the first two turns are needed
+        full_log: List[List[Any]] = trial_data["interaction_log"]
+        chosen_metrics = metrics or ["intentionality", "secrecy", "mechanism", "coherence"]
+        include_private_eff = (
+            include_private if include_private is not None else (self.mode == "memory")
         )
 
-        logging.info("Evaluating 'Secrecy'...")
-        secrecy_eval = self._evaluate_metric(
-            prompt_template=SECRECY_JUDGE_PROMPT,
-            log_segment=full_log
-        )
+        # Map include_private flag to prompt mode: True -> memory, False -> behavioral
+        effective_mode = "memory" if include_private_eff else "behavioral"
+        prompt_bundle = get_prompts(self.game, effective_mode)
+        metric_prompts = prompt_bundle["metrics"]
+        format_instructions = prompt_bundle["format_instructions"]
 
-        logging.info("Evaluating 'Mechanism'...")
-        mechanism_eval = self._evaluate_metric(
-            prompt_template=MECHANISM_JUDGE_PROMPT,
-            log_segment=full_log
-        )
-        
-        logging.info("Evaluating 'Conversational Coherence'...")
-        coherence_eval = self._evaluate_metric(
-            prompt_template=COHERENCE_JUDGE_PROMPT,
-            log_segment=full_log
-        )
-        
-        return {
-            "intentionality": intentionality_eval,
-            "secrecy": secrecy_eval,
-            "mechanism": mechanism_eval,
-            "coherence": coherence_eval,
-        }
+        results: Dict[str, Any] = {}
+
+        if "intentionality" in chosen_metrics and "intentionality" in metric_prompts:
+            logging.info("Evaluating 'Intentionality'...")
+            results["intentionality"] = self._evaluate_metric(
+                prompt_template=metric_prompts["intentionality"],
+                log_segment=full_log[:2],  # early-turn signal
+                include_private=include_private_eff,
+                format_instructions=format_instructions,
+            )
+
+        if "secrecy" in chosen_metrics and "secrecy" in metric_prompts:
+            logging.info("Evaluating 'Secrecy'...")
+            results["secrecy"] = self._evaluate_metric(
+                prompt_template=metric_prompts["secrecy"],
+                log_segment=full_log,
+                include_private=include_private_eff,
+                format_instructions=format_instructions,
+            )
+
+        if "mechanism" in chosen_metrics and "mechanism" in metric_prompts:
+            logging.info("Evaluating 'Mechanism'...")
+            results["mechanism"] = self._evaluate_metric(
+                prompt_template=metric_prompts["mechanism"],
+                log_segment=full_log,
+                include_private=include_private_eff,
+                format_instructions=format_instructions,
+            )
+
+        if "coherence" in chosen_metrics and "coherence" in metric_prompts:
+            logging.info("Evaluating 'Conversational Coherence'...")
+            results["coherence"] = self._evaluate_metric(
+                prompt_template=metric_prompts["coherence"],
+                log_segment=full_log,
+                include_private=include_private_eff,
+                format_instructions=format_instructions,
+            )
+
+        return results
