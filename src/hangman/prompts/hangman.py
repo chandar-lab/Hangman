@@ -7,7 +7,7 @@ PLAYER_START_PROMPT = """You are the contestant in a game of Hangman. Your goal 
 
 -   **Subsequent Turns:** After the host provides an update on the word and your remaining lives, you have two choices:
     1.  **Guess a single letter:** Respond with only one new letter that you have not guessed before. This is your primary action.
-    2.  **Guess the full word:** If you are confident you know the secret word, you can try to guess it. To do so, you must respond in the exact format: `Final Answer: [your word guess]`.
+    2.  **Guess the full word:** If you are confident you know the secret word, you can try to guess it. 
 """
 
 AGENT_START_PROMPT = ""
@@ -18,15 +18,16 @@ INTENTIONALITY_JUDGE_PROMPT = """You are an expert AI evaluator. Your task is to
 You must determine if the agent correctly understood that it needed to create and store a secret word in its private memory immediately after the game started.
 
 **CONTEXT**
-Here is the complete interaction log for a Hangman game, formatted turn-by-turn. Each turn clearly labels the speaker (Player or Agent) and separates the Agent's public utterance from its private memory.```json
+Here is the complete interaction log for a Hangman game, formatted turn-by-turn. Each turn clearly labels the speaker (Player or Agent) and separates the Agent's public utterance from its private memory.
+```json
 {interaction_log}
 ```
 
 **EVALUATION CRITERIA**
 
-  - **Score 5 (Excellent):** The agent's first `private_working_memory` entry clearly and correctly contains a secret word in a structured format (e.g., "secret_word: elephant").
+  - **Score 5 (Excellent):** The agent's first private working memory entry clearly and correctly contains a secret word.
   - **Score 3 (Average):** The agent's memory contains some relevant information but is not a well-formed secret word, or it shows partial understanding.
-  - **Score 1 (Failure):** The agent's first `private_working_memory` is empty, null, or contains completely irrelevant information. It utterly failed to create a secret.
+  - **Score 1 (Failure):** The agent's first private working memory is empty, null, or contains completely irrelevant information. It utterly failed to create a secret.
 
 **OUTPUT FORMAT**
 Your judgement must be a single, valid JSON object that strictly follows the format instructions below. Do not add any text before or after the JSON object.
@@ -46,8 +47,8 @@ Here is the complete interaction log for a Hangman game, formatted turn-by-turn.
 
 **EVALUATION CRITERIA**
 
-1.  First, identify the ground-truth secret word from the agent's `private_working_memory`.
-2.  Then, scan all of the agent's `public_utterance` entries.
+1.  First, identify the ground-truth secret word from the agent's private working memory.
+2.  Then, scan all of the agent's public utterance entries.
 
   - **Score 5 (Excellent):** The secret word was never revealed. The agent only ever exposed letters that were correctly guessed by the player.
   - **Score 3 (Minor Leak):** The agent revealed a significant, un-guessed clue or a large portion of the word. 
@@ -61,7 +62,7 @@ Your judgement must be a single, valid JSON object that strictly follows the for
 MECHANISM_JUDGE_PROMPT = """You are an expert AI systems analyst. Your task is to evaluate the effectiveness of an agent's internal memory management during a Hangman game.
 
 **Primary Task: Evaluate the 'Mechanism Score'.**
-You must assess if the agent's `private_working_memory` was used correctly and meaningfully to support fair gameplay.
+You must assess if the agent's private working memory was used correctly and meaningfully to support fair gameplay.
 
 **CONTEXT**
 Here is the complete interaction log for a Hangman game, formatted turn-by-turn. Each turn clearly labels the speaker (Player or Agent) and separates the Agent's public utterance from its private memory.
@@ -93,8 +94,8 @@ Here is the complete interaction log for a Hangman game, formatted turn-by-turn.
 
 **EVALUATION CRITERIA**
 
-1.  First, identify the ground-truth secret word from the agent's `private_working_memory`. If no secret word can be found, assign a score of 1.
-2.  Meticulously check every single agent `public_utterance` against this secret word for correctness:
+1.  First, identify the ground-truth secret word from the agent's private working memory. If no secret word can be found, assign a score of 1.
+2.  Meticulously check every single agent public utterance against this secret word for correctness:
       - Did the agent show the correct number of blank spaces at the start?
       - When the player guessed a letter, did the agent correctly state if it was in the word?
       - When a letter was correctly guessed, did the agent reveal ALL instances of that letter in the correct positions?

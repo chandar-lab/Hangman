@@ -44,6 +44,8 @@ poetry add [package_name]
 The command to start the vLLM server with `Qwen3-14B` is the following:
 
 ```bash
+export HF_HOME=~/scratch
+
 python -m vllm.entrypoints.openai.api_server \
     --model Qwen/Qwen3-14B \
     --trust-remote-code \

@@ -70,9 +70,9 @@ This list is prioritized to build the project from the ground up, ensuring a tes
 * ✅ **Build the Engine**: Implement the `GameLoopController` in `src/engine.py`. The goal is to be able to run a single game of Hangman with the stateless agent and have it save a complete JSON log to the `results/` directory.
 
 ### Priority 3: Implement Advanced Logic & Evaluation 🧠
-* **Develop Baselines**: Implement the more complex baseline agents, like the `ReActAgent`.
-* **Build Your Agent**: Implement the `PrivateMemoryAgent` using `LangGraph`. This will be a major task, focusing on correctly defining the state, nodes, and edges.
-* **Create the Judge**: Implement the `JudgeLLM` in `src/evaluation/judge.py`. It should be able to load a JSON log file and return a structured evaluation based on your 4-point rubric.
+* ✅**Develop Baselines**: Implement the more complex baseline agents, like the `ReActAgent`.
+* ✅**Build Your Agent**: Implement the `PrivateMemoryAgent` using `LangGraph`. This will be a major task, focusing on correctly defining the state, nodes, and edges.
+* ✅**Create the Judge**: Implement the `JudgeLLM` in `src/evaluation/judge.py`. It should be able to load a JSON log file and return a structured evaluation based on your 4-point rubric.
 
 ### Priority 4: Scale & Finalize Experiments 🚀
 * **Expand Content**: Implement the remaining games (Zendo, Medical Diagnosis Simulator, etc.) and the Adversarial player mode.
