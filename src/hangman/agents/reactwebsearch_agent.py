@@ -20,7 +20,7 @@ from hangman.prompts.reactwebsearch_agent import MAIN_SYSTEM_PROMPT
 
 class AgentState(TypedDict):
     """The state for the ReActWebSearchAgent."""
-    messages: Annotated[Sequence[BaseMessage], add_messages]
+    messages: List[BaseMessage]
     thinking: str
     working_memory: str
 

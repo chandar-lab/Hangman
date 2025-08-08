@@ -25,7 +25,7 @@ from hangman.prompts.reactwscode_agent import MAIN_SYSTEM_PROMPT
 
 class AgentState(TypedDict):
     """The state for the ReActWSCodeAgent."""
-    messages: Annotated[Sequence[BaseMessage], add_messages]
+    messages: List[BaseMessage]
     thinking: str
     working_memory: str
     sandbox_files: List[str]  

@@ -29,7 +29,7 @@ class AgentState(TypedDict):
     messages: List[BaseMessage]
     
     # The agent's private, internal knowledge and scratchpad
-    working_memory: Dict[str, Any]
+    working_memory: str
     
     # The public-facing response for the current turn
     response: str

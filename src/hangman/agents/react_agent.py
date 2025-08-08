@@ -22,7 +22,7 @@ from hangman.prompts.react_agent import MAIN_SYSTEM_PROMPT
 
 class AgentState(TypedDict):
     """The state for the ReActAgent."""
-    messages: Annotated[Sequence[BaseMessage], add_messages]
+    messages: List[BaseMessage]
     thinking: str
     working_memory: str
 

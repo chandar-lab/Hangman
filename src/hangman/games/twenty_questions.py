@@ -1,39 +1,39 @@
 from typing import List, Tuple, Optional
+import importlib
 
 # --- Project-Specific Imports ---
 from hangman.games.base_game import BaseGame
-from hangman.prompts.hangman import AGENT_START_PROMPT, PLAYER_START_PROMPT
+from hangman.prompts.twenty_questions import AGENT_START_PROMPT, PLAYER_START_PROMPT
 
-class HangmanGame(BaseGame):
+class TwentyQuestionsGame(BaseGame):
     """
-    A concrete implementation of BaseGame for the game of Hangman.
+    A concrete implementation of BaseGame for the classic "20 Questions" game.
 
-    This class adheres to the "game as a log" principle. It does not contain
-    any game logic (like tracking lives or the secret word). Its primary
-    purpose is to serve as a configuration holder for a Hangman game,
-    providing the initial prompts required by the agent and player, while
-    relying on the parent BaseGame class for all logging functionality.
+    This follows the same "game as a log" principle as HangmanGame. It does not
+    implement gameplay mechanics. Instead, it configures the initial prompts for
+    the agent and player roles, and relies on the BaseGame to record public
+    utterances and optional private state snapshots per turn.
     """
 
     @property
     def name(self) -> str:
         """A string identifier for the game."""
-        return "hangman"
+        return "twenty_questions"
 
     def __init__(self):
         """
-        Initializes the Hangman game by loading its specific prompts and
+        Initializes the 20 Questions game by loading its specific prompts and
         setting up the interaction log via the parent class.
         """
         super().__init__()
+
         self.agent_start_prompt: str = AGENT_START_PROMPT
         self.player_start_prompt: str = PLAYER_START_PROMPT
-        print("HangmanGame initialized with specific prompts.")
+
+        print("TwentyQuestionsGame initialized with specific prompts.")
 
     def reset(self) -> None:
-        """
-        Resets the game by clearing the interaction log.
-        """
+        """Resets the game by clearing the interaction log."""
         super().reset()
 
     def update_state(self, utterance: str, private_state: Optional[str] = None) -> None:
