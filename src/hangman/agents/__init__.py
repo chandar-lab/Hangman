@@ -10,7 +10,7 @@ runners or benchmark scripts) can remain decoupled from the specific constructor
 details of each agent.
 """
 
-from typing import Optional
+from typing import Optional, List
 
 # --- Import Provider and Base Types for Type Hinting ---
 from hangman.providers.llmprovider import LLMProvider
@@ -18,10 +18,12 @@ from hangman.agents.base_agent import BaseAgent, ModelOutput
 
 # --- Import Concrete Agent Implementations ---
 from hangman.agents.react_agent import ReActAgent
+from hangman.agents.reactmem_agent import ReActMemAgent
 from hangman.agents.reakeeact_agent import ReaKeeActAgent
 from hangman.agents.readisoveact_agent import ReaDisOveActAgent
 from hangman.agents.readispatact_agent import ReaDisPatActAgent
 from hangman.agents.readisupdact_agent import ReaDisUpdActAgent
+from hangman.tools import update_memory, get_search_tool, E2BCodeInterpreterTool
 
 # --- Public API of the 'agents' package ---
 __all__ = [
@@ -29,6 +31,7 @@ __all__ = [
     "BaseAgent",
     "ModelOutput",
     "ReActAgent",
+    "ReActMemAgent",
     "ReaKeeActAgent",
     "ReaDisOveActAgent",
     "ReaDisPatActAgent",
@@ -40,7 +43,11 @@ __all__ = [
 def create_agent(
     agent_name: str,
     main_llm_provider: LLMProvider,
-    distillation_llm_provider: Optional[LLMProvider] = None
+    distillation_llm_provider: Optional[LLMProvider] = None,
+    *,
+    enable_websearch: bool = False,
+    enable_code: bool = False,
+    search_provider: str = "duckduckgo",
 ) -> BaseAgent:
     """
     Factory function to create an agent instance by its class name.
@@ -59,7 +66,19 @@ def create_agent(
     """
     # Agents that only require a single LLM provider
     if agent_name == "ReActAgent":
-        return ReActAgent(main_llm_provider=main_llm_provider)
+        tools: List = []
+        if enable_websearch:
+            tools.append(get_search_tool(provider=search_provider))
+        if enable_code:
+            tools.append(E2BCodeInterpreterTool().as_langchain_tool())
+        return ReActAgent(main_llm_provider=main_llm_provider, tools=tools)
+    elif agent_name == "ReActMemAgent":
+        tools: List = [update_memory]
+        if enable_websearch:
+            tools.append(get_search_tool(provider=search_provider))
+        if enable_code:
+            tools.append(E2BCodeInterpreterTool().as_langchain_tool())
+        return ReActMemAgent(main_llm_provider=main_llm_provider, tools=tools)
     elif agent_name == "ReaKeeActAgent":
         return ReaKeeActAgent(main_llm_provider=main_llm_provider)
 

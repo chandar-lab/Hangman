@@ -1,62 +1,92 @@
 # AI Agent with Working Memory & Reasoning Distillation
-This project is a command-line conversational AI agent built using LangGraph. It features a private "working memory" that allows it to maintain context and evolve its understanding throughout a conversation, powered by a reasoning distillation loop.
-The agent's backend is a local language model served with vLLM, providing an efficient, OpenAI-compatible API for inference.
+Conversational agents with private working memory and a reasoning distillation loop, evaluated on simple games (default: Hangman). Backed by vLLM via an OpenAI-compatible API.
 
 ![Alt text](assets/Main_Figure_Hangman.png "Optional Title")
 
+## What this repo does
+- Benchmarks agents that keep a private state (“working memory”) and refine it each turn via think → distill → patch.
+- Runs single games and batch experiments, logs full interactions (public utterances + private memory), and scores with an LLM Judge.
 
-## Key Features
- * 🧠 **Private Working Memory**: The agent maintains an internal state that is updated after each interaction.
- * 🤔 **Reasoning Distillation**: Uses a "diff and patch" model to reflect on conversations and decide what information to add or modify in its memory.
- * ⚙️ **Modular LLM Backend**: Easily connects to any model served via a vLLM server.
- * 💬 **Interactive CLI**: A simple and straightforward command-line interface for chatting with the agent.
+## How it works (flow in one page)
+1) Providers
+    - `config.yaml` declares LLM endpoints (local vLLM or OpenRouter), model names, parsing format (think tags vs direct), and gen params.
+    - `LLMProvider` wraps an OpenAI-compatible client and parses optional <think>…</think> text.
 
-## 🚀 Setup and Usage
-Follow these steps to set up the environment and run the agent.
-1. **Prerequisites**
-Make sure you have **Python 3.11+** and **Poetry** installed on your system. You can install Poetry by following the instructions on the [official website](https://python-poetry.org/docs/).
+2) Agent (example: ReaDisPatActAgent)
+    - LangGraph workflow: generate_response → generate_diff → apply_diff.
+    - Response uses `working_memory` as context; distillation LLM emits a text patch; diff-match-patch updates `working_memory`.
+    - A persistent “main_thread” stores messages + memory across turns.
 
-2. **Clone the Repository**
-Clone this repository to your local machine and navigate into the project directory.
+3) Player
+    - `LLMPlayer` role-plays using a system prompt and a role-reversed copy of the public conversation.
+
+4) Game engine
+    - `GameLoopController` alternates turns (Player ↔ Agent), appends a per-turn record: (utterance, agent_private_state), and live-writes a JSON.
+    - End-of-run, it calls `LLMJudge` to score metrics and merges results into the same JSON.
+
+5) Judge
+    - `LLMJudge` selects prompts via `evaluation/prompt_registry.py` for “memory” vs “behavioral” modes and extracts a JSON with scores for metrics (intentionality, secrecy, mechanism, coherence).
+
+## Architecture (modules)
+- providers: `LLMProvider`, `load_llm_provider` (OpenAI-compatible client + think-tag parsing)
+- agents: `BaseAgent` + variants (notably `ReaDisPatActAgent` with LangGraph)
+- players: `LLMPlayer` (role-player)
+- games: “Game as a log” (`BaseGame`, `HangmanGame` for prompts)
+- engine: `GameLoopController` (turn loop, JSON logs, judge)
+- evaluation: `LLMJudge` + prompt registry
+- prompts: game- and agent-specific prompt templates
+
+## Data flow (inputs → engine → outputs)
+- Inputs: `games_run.yaml` (game, agents, trials, max_turns, eval modes/metrics, provider names) + `config.yaml` (provider specs).
+- Runtime: Engine passes LangChain messages between Player (as user) and Agent (as assistant). Agent maintains private `working_memory` via diff/patch.
+- Outputs: One JSON per trial under `results/<game>/<agent>/…` with metadata, `interaction_log` (list of [utterance, private_state]), and `evaluation`.
+
+---
+
+## Setup 
+Prereqs: Python 3.11+ and Poetry installed.
+
+Clone and enter the repo:
 ```Bash
 git clone https://github.com/chandar-lab/Hangman.git
 cd hangman
 ```
 
-3. **Install Dependencies**
-Run the following command. Poetry will automatically create a virtual environment inside this project folder (`.venv`) and install all the necessary dependencies from the pyproject.toml file.
+Install deps (Poetry creates .venv and installs from pyproject.toml):
 ```Bash
 poetry install
 ```
 
-4. **Activate the Virtual Environment**
-To activate the environment and start working on the project, use the poetry shell command.
+Activate the virtualenv:
 ``` Bash
 source ./.venv/bin/activate
 ```
 
-While to add a package run
+Add packages (optional):
 ```Bash
 poetry add [package_name]
 ```
 
-5. **Serve the Language Model (Terminal 1)**
-The command to start the vLLM server with `Qwen3-14B` is the following:
-
+Serve the local model with vLLM (Terminal 1):
 ```bash
 export HF_HOME=~/scratch
 
 python -m vllm.entrypoints.openai.api_server \
-    --model Qwen/Qwen3-14B \
-    --trust-remote-code \
-    --port 8000 \
-    --dtype bfloat16 \
-    --enable-auto-tool-choice \
-    --tool-call-parser hermes
+     --model Qwen/Qwen3-14B \
+     --trust-remote-code \
+     --port 8000 \
+     --dtype bfloat16 \
+     --enable-auto-tool-choice \
+     --tool-call-parser hermes
 ```
 
-6. **Run the Agent (Terminal 2)**
-In a second terminal (with the venv still activated), run the agent script. You can now start chatting with the agent.
+Notes on API keys for local vLLM:
+- If you run a local server at http://localhost (or 127.0.0.1), this project will allow an empty API key even when an `api_key_env` is configured in `config.yaml`.
+- You can set `VLLM_API_KEY` if your local server enforces authentication, but it’s not required for typical localhost setups.
+- For remote endpoints (e.g., OpenRouter), a valid API key is still required and the app will fail fast if it’s missing.
+
+## Run
+Quick chat loops (Terminal 2, venv activated):
 ```Bash
 python src/hangman/agents/readispatactagent.py
 ```
@@ -65,13 +95,25 @@ or
 python src/hangman/agents/react.py
 ```
 
-or make the agent interact with the player by
+Agent vs Player (engine-driven game loop):
 ```Bash
 python src/hangman/engine.py
 ```
 
-And start playing! Try this prompt:
-
+Suggested first message:
 ```
 Let's play Hangman! You be the host. Think of a secret word, but don't tell me what it is. I'll try to guess it, one letter at a time. Just show me the blank spaces for the word to start.
 ```
+
+Batch experiments:
+- Edit `games_run.yaml` (agents, trials, max_turns, providers, eval modes)
+- Then run:
+```bash
+python run_experiment.py
+```
+
+## Results
+- JSON logs written to `results/<game>/<agent>/…` with:
+  - `metadata`: game, agent, provider configs, timestamps
+  - `interaction_log`: `[utterance, private_state]` per turn
+  - `evaluation`: LLMJudge scores per metric/mode

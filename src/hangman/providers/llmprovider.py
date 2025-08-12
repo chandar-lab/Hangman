@@ -47,15 +47,25 @@ class LLMProvider:
     def _create_client(self) -> Any:
         # This factory handles any OpenAI-compatible API (vLLM, OpenRouter, etc.)
         api_key_env = self.config["api_config"].get("api_key_env")
-        api_key = os.environ.get(api_key_env) if api_key_env else "not-needed"
-        
+        base_url = self.config["api_config"].get("base_url")
+        api_key = os.environ.get(api_key_env) if api_key_env else None
+
+        # Allow missing API key for localhost endpoints (common for local vLLM servers)
         if api_key_env and api_key is None:
-            raise ValueError(f"API key environment variable '{api_key_env}' not set.")
+            if isinstance(base_url, str) and ("localhost" in base_url or "127.0.0.1" in base_url):
+                logging.warning(
+                    "API key env '%s' not set, but base_url looks local (%s). Proceeding without a key.",
+                    api_key_env,
+                    base_url,
+                )
+                api_key = ""
+            else:
+                raise ValueError(f"API key environment variable '{api_key_env}' not set.")
 
         return ChatOpenAI(
             model=self.config["model_name"],
-            base_url=self.config["api_config"].get("base_url"),
-            api_key=api_key,
+            base_url=base_url,
+            api_key=api_key or "",  # Some OpenAI-compatible servers accept empty tokens for local use
             temperature=self.config["generation_config"].get("temperature", 0.7),
             max_tokens=self.config["generation_config"].get("max_tokens", 4096),
         )

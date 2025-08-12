@@ -1,17 +1,18 @@
-from typing import List
+from typing import List, Optional
 from langchain_core.tools import tool
 
 # --- Tool Definition ---
 
+# current_memory arg is not truly optional but it is handled in the tool invokation in the agent's implementations
+
 @tool
-def update_memory(deletions: List[int], insertions: List[str], current_memory: str) -> str:
+def update_memory(deletions: List[int], insertions: List[str], current_memory: Optional[str] = None) -> str:
     """
     Updates the working memory by deleting specified line numbers and appending new items.
     
     Args:
         deletions: A list of line numbers to delete from the memory. Numbers are 1-based.
         insertions: A list of new strings to add to the end of the memory.
-        current_memory: The current working memory string.
     
     Returns:
         The newly formatted working memory string.

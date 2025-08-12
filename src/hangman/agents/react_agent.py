@@ -1,210 +1,204 @@
-import os
 import yaml
-import json
-from typing import List, Any, Dict, Sequence, Annotated
+from typing import List, Any, Dict, Optional
 
-# --- Core LangChain/LangGraph Imports ---
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
-# from langchain_core.tools import tool
 from langgraph.graph import StateGraph, END
-from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
 from typing_extensions import TypedDict
 
-# --- Project-Specific Imports ---
 from hangman.agents.base_agent import BaseAgent, ModelOutput
 from hangman.providers.llmprovider import LLMProvider, load_llm_provider
-
-from hangman.tools.update_memory import update_memory
+from hangman.tools import format_e2b_output_to_str
 from hangman.prompts.react_agent import MAIN_SYSTEM_PROMPT
 
-# --- Agent State and Class Definition ---
 
-class AgentState(TypedDict):
-    """The state for the ReActAgent."""
+class AgentState(TypedDict, total=False):
     messages: List[BaseMessage]
     thinking: str
-    working_memory: str
+    # Present only when code tool is enabled
+    sandbox_files: List[str]
+
 
 class ReActAgent(BaseAgent):
-    """
-    An agent that uses the ReAct (Reason+Act) paradigm.
-    Its only tool is the ability to edit its own working memory.
-    """
-    def __init__(self, main_llm_provider: LLMProvider):
-        # This agent only needs one LLM.
-        self.tools = [update_memory]
+    """Stateless ReAct agent (no working memory). Accepts pre-initialized tools."""
+
+    def __init__(self, main_llm_provider: LLMProvider, tools: Optional[List[Any]] = None):
+        self.tools = tools or []  # no update_memory by default
         self.tools_by_name = {t.name: t for t in self.tools}
-        
-        # Bind the tools to the LLM
         self.model = main_llm_provider.client.bind_tools(self.tools)
 
         super().__init__(llm_provider=main_llm_provider)
-        self.turn_counter = 0 # Used for thread management
+        self.turn_counter = 0
         self.reset()
 
     def _build_workflow(self) -> StateGraph:
-        """Constructs the agent's LangGraph workflow."""
-        workflow = StateGraph(AgentState)
+        graph = StateGraph(AgentState)
+        graph.add_node("agent", self._call_model)
+        graph.add_node("tools", self._tool_node)
+        graph.set_entry_point("agent")
+        graph.add_conditional_edges("agent", self._should_continue, {"continue": "tools", "end": END})
+        graph.add_edge("tools", "agent")
+        return graph.compile(checkpointer=MemorySaver())
 
-        workflow.add_node("agent", self._call_model)
-        workflow.add_node("tools", self._tool_node)
+    def _build_prompt_messages(self, state: AgentState) -> List[BaseMessage]:
+        """Build messages for this pass: pruned history + full current-turn trace."""
+        msgs: List[BaseMessage] = state.get("messages", [])
+        last_human_idx = -1
+        for i in range(len(msgs) - 1, -1, -1):
+            if isinstance(msgs[i], HumanMessage):
+                last_human_idx = i
+                break
 
-        workflow.set_entry_point("agent")
+        if last_human_idx == -1:
+            history = [m for m in msgs if isinstance(m, HumanMessage) or (isinstance(m, AIMessage) and not getattr(m, "tool_calls", None))]
+            current_turn: List[BaseMessage] = []
+        else:
+            history = msgs[:last_human_idx]
+            history = [m for m in history if isinstance(m, HumanMessage) or (isinstance(m, AIMessage) and not getattr(m, "tool_calls", None))]
+            current_turn = msgs[last_human_idx:]
 
-        workflow.add_conditional_edges(
-            "agent",
-            self._should_continue,
-            {"continue": "tools", "end": END},
-        )
-        workflow.add_edge("tools", "agent")
+        return history + current_turn
 
-        return workflow.compile(checkpointer=MemorySaver())
-
-    # --- Graph Nodes and Logic ---
-
-    def _should_continue(self, state: AgentState):
-        """Determines whether to continue with a tool call or end."""
+    def _should_continue(self, state: AgentState) -> str:
         if not state["messages"][-1].tool_calls:
             return "end"
         return "continue"
 
     def _call_model(self, state: AgentState) -> Dict[str, Any]:
-        """Invokes the LLM with the current state to decide on an action or response."""
-        print("---NODE: AGENT---")
-        # Format the system prompt with the current working memory
-        system_prompt = SystemMessage(content=MAIN_SYSTEM_PROMPT.format(working_memory=state["working_memory"]))
-        messages = [system_prompt] + state["messages"]
+        # Stateless prompt (no working_memory)
+        system_prompt = SystemMessage(content=MAIN_SYSTEM_PROMPT)
+        prompt_messages = [system_prompt] + self._build_prompt_messages(state)
 
-        response_obj = self.model.invoke(messages)
-        parsed_output = self.llm_provider.parse_response(response_obj.content or "")
-        response_obj.content = parsed_output["response"]
-        return {
-            "messages": [response_obj],
-            "working_memory": state["working_memory"],
-            "thinking": parsed_output["thinking"]
-        }
-        
+        response_obj = self.model.invoke(prompt_messages)
+        parsed = self.llm_provider.parse_response(response_obj.content or "")
+        has_tool_calls = bool(getattr(response_obj, "tool_calls", None))
+        if not has_tool_calls:
+            response_obj.content = parsed["response"]
+        # Attach thinking so we can reconstruct within-turn chronology
+        try:
+            response_obj.additional_kwargs = getattr(response_obj, "additional_kwargs", {}) or {}
+            response_obj.additional_kwargs["thinking"] = parsed.get("thinking", "")
+        except Exception:
+            pass
+        return {"messages": state["messages"] + [response_obj], "thinking": parsed.get("thinking", "")}
+
     def _tool_node(self, state: AgentState) -> Dict[str, Any]:
-        """Executes tools and updates state."""
         tool_call = state["messages"][-1].tool_calls[0]
         tool = self.tools_by_name[tool_call["name"]]
-        
-        # The `update_memory` tool needs the current memory to modify it
-        tool_args = tool_call["args"]
-        tool_args["current_memory"] = state["working_memory"]
+        tool_args = dict(tool_call["args"])
 
-        new_memory = tool.invoke(tool_args)
-        
-        tool_message = ToolMessage(
-            content=f"Successfully updated working memory.",
-            name=tool_call["name"],
-            tool_call_id=tool_call["id"],
-        )
-        # Update both working memory and add the tool result message
-        return {"working_memory": new_memory, "messages": [tool_message]}
+        if tool.name == "web_search":
+            result = tool.invoke(tool_args)
+            tool_message = ToolMessage(content=result, name=tool_call["name"], tool_call_id=tool_call["id"])
+            return {"messages": state["messages"] + [tool_message]}
+
+        if tool.name == "code_interpreter":
+            observation = tool.invoke(tool_args)
+            content_str = format_e2b_output_to_str(observation)
+            tool_message = ToolMessage(content=content_str, name=tool_call["name"], tool_call_id=tool_call["id"])
+            return {"messages": state["messages"] + [tool_message], "sandbox_files": observation.get("files", [])}
+
+        # Fallback
+        result = tool.invoke(tool_args)
+        tool_message = ToolMessage(content=str(result), name=tool_call["name"], tool_call_id=tool_call["id"])
+        return {"messages": state["messages"] + [tool_message]}
 
     def invoke(self, messages: List[BaseMessage]) -> ModelOutput:
-        """
-        Runs the ReAct loop for a single turn using a temporary thread for
-        isolation, while persisting the working_memory in the 'main_thread'.
-        """
         self.turn_counter += 1
-        # Create a temporary, unique thread for this specific turn's execution
-        turn_thread_config = {"configurable": {"thread_id": f"react_turn_{self.turn_counter}"}}
-        main_thread_config = {"configurable": {"thread_id": "main_thread"}}
-        
-        # 1. Get the last known working memory from the persistent main thread
-        try:
-            current_state = self.get_state() # Gets state from "main_thread"
-            current_working_memory = current_state.get("working_memory", "")
-        except Exception:
-            current_working_memory = ""
-        
-        # 2. Invoke the graph in the temporary thread.
-        #    This prevents state conflicts between complex ReAct loops.
-        final_state = self.workflow.invoke(
-            {"messages": messages, "working_memory": current_working_memory}, 
-            config=turn_thread_config
-        )
-        
-        # 3. Explicitly save the updated working memory back to the main thread for the next turn.
-        self.workflow.update_state(
-            main_thread_config,
-            {"working_memory": final_state["working_memory"], "messages": final_state["messages"]}
-        )
-        
-        # 4. Extract the final response for the user
+        turn_cfg = {"configurable": {"thread_id": f"react_stateless_turn_{self.turn_counter}"}}
+        main_cfg = {"configurable": {"thread_id": "main_thread"}}
+
+        initial_state: Dict[str, Any] = {"messages": messages}
+        # If a code tool is present, carry sandbox_files across turns
+        if "code_interpreter" in self.tools_by_name:
+            try:
+                current = self.get_state()
+                initial_state["sandbox_files"] = current.get("sandbox_files", [])
+            except Exception:
+                initial_state["sandbox_files"] = []
+
+        final_state = self.workflow.invoke(initial_state, config=turn_cfg)
+
+        # Persist pruned conversation: keep prior + only final AI (drop tool calls and ToolMessages)
+        full_msgs: List[BaseMessage] = final_state["messages"]
+        base_len = len(messages)
+        prior_msgs = full_msgs[:base_len]
+        turn_msgs = full_msgs[base_len:]
+
+        pruned_turn_msgs: List[BaseMessage] = []
+        for m in reversed(turn_msgs):
+            if isinstance(m, AIMessage) and not getattr(m, "tool_calls", None):
+                pruned_turn_msgs = [m]
+                break
+        persisted_messages = prior_msgs + pruned_turn_msgs
+
+        update_payload: Dict[str, Any] = {"messages": persisted_messages}
+        if "code_interpreter" in self.tools_by_name:
+            update_payload["sandbox_files"] = final_state.get("sandbox_files", [])
+        self.workflow.update_state(main_cfg, update_payload)
+
+        # Final response content
         final_response = ""
-        for msg in reversed(final_state["messages"]):
+        for msg in reversed(full_msgs):
             if isinstance(msg, AIMessage) and not msg.tool_calls:
                 final_response = msg.content
                 break
-        
-        # 5. Create a comprehensive thinking trace
-        explicit_thinking = final_state.get("thinking", "")
-        tool_trace = [msg.pretty_repr() for msg in final_state["messages"] if isinstance(msg, (AIMessage, ToolMessage))]
-        full_thinking_trace = f"---Explicit Thought---\n{explicit_thinking}\n\n---Tool Trace---\n" + "\n".join(tool_trace)
-        
-        return {"response": final_response, "thinking": full_thinking_trace}
+
+        # Build current-turn thinking/tool trace
+        trace_lines: List[str] = []
+        for m in turn_msgs:
+            if isinstance(m, AIMessage):
+                thought = getattr(m, "additional_kwargs", {}).get("thinking", "")
+                if thought:
+                    trace_lines.append("---Explicit Thought---")
+                    trace_lines.append(thought)
+                if m.content:
+                    trace_lines.append(str(m.content))
+                trace_lines.append(m.pretty_repr())
+            elif isinstance(m, ToolMessage):
+                trace_lines.append(m.pretty_repr())
+        full_thinking = "\n".join(trace_lines)
+
+        return {"response": final_response, "thinking": full_thinking}
 
     def get_state(self) -> Dict[str, Any]:
-        """
-        Retrieves the latest state snapshot for the main thread and returns
-        the actual state dictionary from its .values attribute.
-        """
-        snapshot = self.workflow.get_state({"configurable": {"thread_id": "main_thread"}})
-        # The state dictionary is stored in the .values attribute of the snapshot
-        if snapshot:
-            return snapshot.values
-        return {} # Return an empty dict if no state exists
+        snap = self.workflow.get_state({"configurable": {"thread_id": "main_thread"}})
+        return snap.values if snap else {}
 
     def get_private_state(self) -> str:
-        state = self.get_state()
-        memory = state.get('working_memory', 'N/A')
-        return memory
+        # Stateless: return empty string for private state
+        return ""
 
     def reset(self) -> None:
-        """Resets the agent by clearing the main thread's state."""
-        empty_state = AgentState(messages=[], working_memory="")
-        self.workflow.update_state({"configurable": {"thread_id": "main_thread"}}, empty_state)
-        print("ReactAgent state has been reset.")
+        empty: AgentState = AgentState(messages=[], thinking="")
+        if "code_interpreter" in self.tools_by_name:
+            empty["sandbox_files"] = []
+        self.workflow.update_state({"configurable": {"thread_id": "main_thread"}}, empty)
+
+    def close(self) -> None:
+        return
 
 
-# --- Runnable CLI for Direct Testing ---
 if __name__ == "__main__":
     CONFIG_PATH = "config.yaml"
-    with open(CONFIG_PATH, 'r') as f:
-        config = yaml.safe_load(f)
+    with open(CONFIG_PATH, "r") as f:
+        yaml.safe_load(f)
 
-    try:
-        main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local")
-        print("✅ LLM Provider loaded successfully.")
-    except Exception as e:
-        print(f"❌ Failed to load LLM Provider: {e}")
-        exit()
-
+    main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local")
     agent = ReActAgent(main_llm_provider=main_llm)
-    print("🤖 ReActAgent is ready. Type 'quit', 'exit', or 'q' to end.")
-
-    messages = []
+    print("ReActAgent (stateless) ready.")
+    messages: List[BaseMessage] = []
     while True:
-        user_input = input("User > ")
-        if user_input.lower() in ["quit", "exit", "q"]:
-            print("Ending session.")
+        user = input("User > ")
+        if user.lower() in ["q", "quit", "exit"]:
             break
-        
-        messages.append(HumanMessage(content=user_input))
-        
+        messages.append(HumanMessage(content=user))
         output = agent.invoke(messages)
-        
         messages.append(AIMessage(content=output["response"]))
-        
         print("\n---ANSWER---")
-        print(f"AI: {output['response']}")
-        print(agent.get_private_state())
-        # Print thinking trace if available
+        print(output["response"])
         if "thinking" in output and output["thinking"]:
             print("\n---THINKING TRACE---")
             print(output["thinking"])
         print("\n" + "="*50 + "\n")
+        

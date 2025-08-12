@@ -4,6 +4,7 @@ from typing import Dict, Any, List, Optional, Literal
 
 from pydantic import BaseModel, Field, field_validator
 from langchain_core.output_parsers import PydanticOutputParser
+from langchain_core.messages import HumanMessage
 from hangman.providers.llmprovider import LLMProvider
 from hangman.evaluation.prompt_registry import get_prompts
 
@@ -125,8 +126,8 @@ class LLMJudge:
             interaction_log=formatted_log, format_instructions=format_instructions
         )
         try:
-            # Send raw prompt string to the provider
-            response = self.llm.invoke([prompt])
+            # Send prompt as a HumanMessage to the provider (expected message type)
+            response = self.llm.invoke([HumanMessage(content=prompt)])
             llm_output_str = response.get("response", "")
         except Exception as e:
             logging.error(f"Judge model invocation failed: {e}")
