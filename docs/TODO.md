@@ -6,17 +6,14 @@ A concise plan of next actions to support Objective 1 (PSITs) and the experiment
   - Phase 1: Judge-based termination using `HangmanJudge` over the current log (fast heuristic) to decide WIN/LOSS/LEAK/INCOHERENCE and stop.
   - Phase 2: (optional) Ground-truth mechanics per game (e.g., Hangman lives/word tracking) for non-LLM termination.
 
-- Refactor agents
-  - Add vanilla stateless LLMs
-    - Vanilla (no CoT), CoT, ToT (tree-style), ReAct (no private state), PublicMemory (memory appended to chat only).
-  - Simplify naming
-    - Use concise names and consistent suffixes (e.g., ReAct, ReaDisPat, ReaDisOve, ReaDisUpd, ReaKee).
-  - Add more complex baselines
-    - Reflexion-style self-reflection (public trace), Cognitive Tools (tool-augmented planning without private state), StateAct (explicit private-state tool usage baseline).
-  - Ensure every agent implements: `invoke()`, `get_private_state()`, `reset()`; align on `ModelOutput` and thread configs.
+-- Refactor Agents
+  - Remove ProvatCoTAgent mentions
+  - Add new patch and ovewrite tools support to ReAct
+  - Double check what is the patch algorithm used by copilot or Gemini CLI
+  - Implement 
 
 - Refactor prompts
-  - Centralize agent prompts; document how/when to read/write private memory.
+  - Centralize agent prompts; document how/when to read/write private memory, what is working memory, how to interact with it.
   - Provide standardized system prompts for player roles (cooperative/adversarial) per game.
 
 - Housekeeping (optional but recommended)

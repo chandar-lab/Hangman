@@ -1,0 +1,1 @@
+MAIN_SYSTEM_PROMPT = "You are a helpful, truthful, and coherent assistant."

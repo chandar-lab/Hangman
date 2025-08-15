@@ -10,7 +10,7 @@ from typing_extensions import TypedDict
 # --- Project-Specific Imports ---
 from hangman.agents.base_agent import BaseAgent, ModelOutput
 from hangman.providers.llmprovider import LLMProvider, load_llm_provider
-from hangman.prompts.stateless_agent import MAIN_SYSTEM_PROMPT
+from hangman.prompts.vanilla_llm_agent import MAIN_SYSTEM_PROMPT
 
 # --- Agent State and Class Definition ---
 
@@ -18,7 +18,7 @@ class AgentState(TypedDict):
     messages: List[BaseMessage]
     thinking: str
 
-class StatelessAgent(BaseAgent):
+class VanillaLLMAgent(BaseAgent):
     """
     A vanilla stateless LLM agent. No private memory, no tools.
     """
@@ -60,7 +60,7 @@ class StatelessAgent(BaseAgent):
         return {}
 
     def get_private_state(self) -> str:
-        return "N/A"
+        return ""
 
     def reset(self) -> None:
         # No persistent state to reset
@@ -77,8 +77,8 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ Failed to load LLM Provider: {e}")
         exit()
-    agent = StatelessAgent(main_llm_provider=main_llm)
-    print("🤖 StatelessAgent is ready. Type 'quit', 'exit', or 'q' to end.")
+    agent = VanillaLLMAgent(main_llm_provider=main_llm)
+    print("🤖 VanillaLLMAgent is ready. Type 'quit', 'exit', or 'q' to end.")
     messages = []
     while True:
         user_input = input("User > ")

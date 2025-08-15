@@ -19,10 +19,10 @@ from hangman.agents.base_agent import BaseAgent, ModelOutput
 # --- Import Concrete Agent Implementations ---
 from hangman.agents.react_agent import ReActAgent
 from hangman.agents.reactmem_agent import ReActMemAgent
-from hangman.agents.reakeeact_agent import ReaKeeActAgent
-from hangman.agents.readisoveact_agent import ReaDisOveActAgent
-from hangman.agents.readispatact_agent import ReaDisPatActAgent
-from hangman.agents.readisupdact_agent import ReaDisUpdActAgent
+from hangman.agents.private_cot_agent import PrivateCoTAgent
+from hangman.agents.public_cot_agent import PublicCoTAgent
+from hangman.agents.vanilla_llm_agent import VanillaLLMAgent
+from hangman.agents.workflow_agent import WorkflowAgent
 from hangman.tools import update_memory, get_search_tool, E2BCodeInterpreterTool
 
 # --- Public API of the 'agents' package ---
@@ -32,10 +32,9 @@ __all__ = [
     "ModelOutput",
     "ReActAgent",
     "ReActMemAgent",
-    "ReaKeeActAgent",
-    "ReaDisOveActAgent",
-    "ReaDisPatActAgent",
-    "ReaDisUpdActAgent",
+    "PrivateCoTAgent",
+    "VanillaLLMAgent",
+    "WorkflowAgent",
 ]
 
 # --- Agent Factory ---
@@ -79,8 +78,9 @@ def create_agent(
         if enable_code:
             tools.append(E2BCodeInterpreterTool().as_langchain_tool())
         return ReActMemAgent(main_llm_provider=main_llm_provider, tools=tools)
-    elif agent_name == "ReaKeeActAgent":
-        return ReaKeeActAgent(main_llm_provider=main_llm_provider)
+    elif agent_name in ["PrivateCoTAgent", "ProvatCoTAgent"]:
+        # Backward compatibility alias: support "ProvatCoTAgent"
+        return PrivateCoTAgent(main_llm_provider=main_llm_provider)
 
     # Agents that require a distillation LLM provider
     elif agent_name in ["ReaDisPatActAgent", "ReaDisOveActAgent", "ReaDisUpdActAgent"]:

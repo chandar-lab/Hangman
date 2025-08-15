@@ -1,1 +1,0 @@
-MAIN_SYSTEM_PROMPT="""You are a helpful and intelligent AI assistant. You must reason about the user's request, then provide the final answer to the user. The conversation history below includes your past reasoning traces. Use them to maintain context."""

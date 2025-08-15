@@ -1,38 +1,60 @@
 # Runtime configuration for run_experiment.py
 
-# Which game to play: hangman | 20_questions | zendo | diagnosis_simulator
+# Which game to play: hangman | twenty_questions | zendo | diagnosis_simulator
 game: hangman
 
-# Agents to evaluate (class names as in hangman.agents.__all__)
+# Agents to evaluate 
 agents:
-  - ReaDisPatActAgent
-  # - ReActAgent
-  # - ReaKeeActAgent
-  # - ReaDisOveActAgent
-  # - ReaDisUpdActAgent
+  - VanillaLLMAgent:
+      main_llm_provider: qwen3_14b_local
+      name: vanilla_llm_agent
+  - PublicCoTAgent:
+      main_llm_provider: qwen3_14b_local
+      name: public_cot_agent
+  - PrivateCoTAgent:
+      main_llm_provider: qwen3_14b_local
+      name: private_cot_agent
+  - WorkflowAgent:
+      responder_llm_provider: qwen3_14b_local
+      updater_llm_provider: qwen3_14b_local
+      strategy: overwrite
+      name: workflow_overwrite_agent
+  - WorkflowAgent:
+      responder_llm_provider: qwen3_14b_local
+      updater_llm_provider: qwen3_14b_local
+      strategy: patch_and_replace
+      name: workflow_patch_and_replace_agent
+  - WorkflowAgent:
+      responder_llm_provider: qwen3_14b_local
+      updater_llm_provider: qwen3_14b_local
+      strategy: delete_and_append
+      name: workflow_delete_and_append_agent
+  - ReActMemAgent:
+      main_llm_provider: qwen3_14b_local
+      strategy: overwrite
+      name: reactmem_overwrite_agent
+  - ReActMemAgent:
+      main_llm_provider: qwen3_14b_local
+      strategy: patch_and_replace
+      name: reactmem_patch_and_replace_agent
+  - ReActMemAgent:
+      main_llm_provider: qwen3_14b_local
+      strategy: delete_and_append
+      name: reactmem_delete_and_append_agent
 
 # Number of trials per agent
 num_trials: 20
 
 # Max turns per game
-max_turns: 2
+max_turns: 20
 
 # Where to save results (will create subfolder per agent)
-results_dir: results/hangman
+results_dir: results/hangman/
 
 # Who moves first: player | agent (judge currently assumes player-first; keep 'player')
 first_mover: player
 
-# Evaluation modes for LLMJudge: "memory" | "behavioral" | "both" | [list]
-eval_modes: both
-
-# Optional subset of metrics: [intentionality, secrecy, mechanism, coherence]
-# If omitted, all applicable metrics for the chosen mode(s) are evaluated.
-# metrics: [intentionality, secrecy, mechanism, coherence]
-
-# LLM providers to use (must match names in config.yaml)
-providers:
-  main: qwen3_14b_local
-  distill: qwen3_14b_local
-  player: qwen3_14b_local
-  judge: qwen3_14b_local
+# Evaluation mode for LLMJudge: "memory" | "behavioral" | "both"
+judge:
+  mode: both
+  judge_llm_provider: qwen3_14b_local

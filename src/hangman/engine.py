@@ -7,13 +7,13 @@ from typing import List, Dict, Any, Optional, Union, Literal
 
 # --- Project-Specific Imports ---
 from hangman.agents.base_agent import BaseAgent
-from hangman.agents.readispatact_agent import ReaDisPatActAgent
 from hangman.players.base_player import BasePlayer
 from hangman.games.base_game import BaseGame
 from hangman.games.hangman import HangmanGame
 from hangman.providers.llmprovider import LLMProvider, load_llm_provider
 from hangman.players.llm_player import LLMPlayer
 from hangman.evaluation.judge import LLMJudge
+from hangman.agents import WorkflowAgent
 
 # Add the project root to the Python path to allow for absolute imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -135,7 +135,7 @@ class GameLoopController:
     def run(
         self,
         first_mover: str = "player",
-        eval_modes: Union[str, List[str]] = "both",
+        eval_mode: Union[str, List[str]] = "both",
         metrics: Optional[List[str]] = None,
     ) -> None:
         """
@@ -143,7 +143,7 @@ class GameLoopController:
 
         Args:
             first_mover: Determines who makes the first move, 'player' or 'agent'.
-            eval_modes: 'memory', 'behavioral', 'both', 'none', or a list like ['memory'].
+            eval_mode: 'memory', 'behavioral', 'both', 'none', or a list like ['memory'].
             metrics: Optional subset of metrics to judge.
         """
         # 1. Reset all components for a clean run
@@ -202,43 +202,33 @@ class GameLoopController:
         # 4. Finalize and evaluate
         final_status = "COMPLETED_MAX_TURNS" if not self._is_game_over() else "COMPLETED_GAME_OVER"
 
-        # Normalize evaluation modes
-        def _normalize_modes(modes: Union[str, List[str]]) -> List[str]:
-            if isinstance(modes, str):
-                key = modes.strip().lower()
+        # Normalize evaluation mode
+        def _normalize_mode(mode: Union[str, List[str]]) -> str:
+            if isinstance(mode, str):
+                key = mode.strip().lower()
                 if key == "both":
-                    return ["memory", "behavioral"]
+                    return "both"
                 if key in {"memory", "behavioral"}:
-                    return [key]
+                    return key
                 if key == "none":
-                    return []
+                    return "behavioral"
                 # default fallback
-                return ["behavioral"]
-            # list-like
-            acc = []
-            for m in modes:
-                mk = str(m).strip().lower()
-                if mk in {"memory", "behavioral"} and mk not in acc:
-                    acc.append(mk)
-            return acc
+                return "behavioral"
 
-        modes = _normalize_modes(eval_modes)
-        evaluation: Dict[str, Any] = {"modes": modes, "results": {}}
+        mode = _normalize_mode(eval_mode)
+        evaluation: Dict[str, Any] = {"mode": mode, "results": {}}
 
-        if modes:
+        if mode:
             trial_data = {
                 "interaction_log": self.game.get_full_state()
             }
-            for mode in modes:
-                include_private = (mode == "memory")
-                try:
-                    evaluation["results"][mode] = self.judge.evaluate_trial(
+            try:
+                evaluation["results"] = self.judge.evaluate_trial(
                         trial_data=trial_data,
                         metrics=metrics,
-                        include_private=include_private,
                     )
-                except Exception as e:
-                    evaluation["results"][mode] = {"error": str(e)}
+            except Exception as e:
+                evaluation["results"] = {"error": str(e)}
 
             # Merge evaluation into the existing log
             self._update_log_with_evaluation(final_status=final_status, evaluation=evaluation)
@@ -288,30 +278,31 @@ if __name__ == "__main__":
     print("🚀 Instantiating components...")
     game = HangmanGame()
     player = LLMPlayer(llm_provider=player_llm)
-    agent = ReaDisPatActAgent(
-        main_llm_provider=agent_main_llm,
-        distillation_llm_provider=agent_distill_llm
+    agent = WorkflowAgent(
+        responder_llm_provider=agent_main_llm,
+        updater_llm_provider=agent_distill_llm,
+        strategy="overwrite"
     )
     
     print("✅ Components instantiated.")
 
     # 4. Initialize the Game Loop Controller
     # Initialize LLMJudge for this game
-    llm_judge = LLMJudge(judge_llm_provider=judge_llm, game="hangman", mode="behavioral")
+    llm_judge = LLMJudge(judge_llm_provider=judge_llm, game="hangman", mode="both")
 
     controller = GameLoopController(
         agent=agent,
         player=player,
         game=game,
         llm_judge=llm_judge,
-        max_turns=12,  # A game of hangman shouldn't take more than ~12 turns
+        max_turns=2,  # A game of hangman shouldn't take more than ~12 turns
         results_dir=RESULTS_DIR
     )
     print("✅ GameLoopController is ready.")
 
     # 5. Run the experiment
     try:
-        controller.run(first_mover="player", eval_modes="both")
+        controller.run(first_mover="player", eval_mode="both")
     except Exception as e:
         print(f"\n🚨 An error occurred during the game loop: {e}")
         print("   Please ensure all components are correctly configured and servers are running.")

@@ -1,19 +1,71 @@
 import sys
 import os
 import yaml
+import inspect
 from datetime import datetime
 from tqdm import tqdm
+from typing import Dict, Any
 
 # --- Project-Specific Imports ---
 from hangman.providers.llmprovider import LLMProvider, load_llm_provider
 from hangman.games import create_game
 from hangman.players.llm_player import LLMPlayer
 from hangman.engine import GameLoopController
-from hangman.agents.base_agent import BaseAgent
 from hangman.evaluation.judge import LLMJudge
 
-# Import all agent classes to be tested
-from hangman.agents import create_agent
+# Import agent factory and classes
+import hangman.agents as agents_pkg
+
+
+# --- Helpers ---
+
+def _instantiate_agent_from_spec(
+    agent_spec: Dict[str, Any],
+    providers_config_path: str,
+    default_main: LLMProvider,
+):
+    """
+    Create an agent instance from:
+      - a dict:  {"ClassName": {kwargs...}} -> instantiate concrete class with kwargs
+    """
+    if isinstance(agent_spec, dict) and len(agent_spec) == 1:
+        class_name, raw_kwargs = next(iter(agent_spec.items()))
+        raw_kwargs = raw_kwargs or {}
+
+        # Resolve class from agents package
+        if not hasattr(agents_pkg, class_name):
+            raise ValueError(f"Unknown agent class '{class_name}' in run config.")
+        AgentClass = getattr(agents_pkg, class_name)
+
+        # Auto-resolve any "*_llm_provider" entries from provider names to LLMProvider objects
+        kwargs = {}
+        for k, v in raw_kwargs.items():
+            if k.endswith("_llm_provider") and isinstance(v, str):
+                kwargs[k] = load_llm_provider(providers_config_path, v)
+            else:
+                kwargs[k] = v
+
+        # Supply sensible defaults if constructor expects them but kwargs omitted
+        sig = inspect.signature(AgentClass.__init__)
+        params = sig.parameters
+
+        if "llm_provider" in params and "llm_provider" not in kwargs:
+            kwargs["llm_provider"] = default_main
+        if "main_llm_provider" in params and "main_llm_provider" not in kwargs:
+            kwargs["main_llm_provider"] = default_main
+        if "responder_llm_provider" in params and "responder_llm_provider" not in kwargs:
+            kwargs["responder_llm_provider"] = default_main
+        if "updater_llm_provider" in params and "updater_llm_provider" not in kwargs:
+            kwargs["updater_llm_provider"] = default_main
+        
+        # drop name from kwargs if it exists
+        if "name" in kwargs:
+            kwargs.pop("name")
+
+        return AgentClass(**kwargs)
+
+    raise ValueError(f"Invalid agent specification: {agent_spec}")
+
 
 # --- Main Experiment Runner ---
 
@@ -34,30 +86,31 @@ def run_experiments():
         sys.exit(1)
 
     game_name = run_cfg.get("game", "hangman")
-    agents_to_test = run_cfg.get("agents", ["ReaDisPatActAgent"])  # default to your main agent
+    agents_to_test = run_cfg.get("agents", ["ReActAgent"])
     num_trials = int(run_cfg.get("num_trials", 20))
     max_turns = int(run_cfg.get("max_turns", 20))
     base_results_dir = run_cfg.get("results_dir", f"results/{game_name}")
 
     # Evaluation configuration for LLMJudge
-    eval_modes = run_cfg.get("eval_modes", "both")  # "memory" | "behavioral" | "both" | [..]
+    judge_cfg = run_cfg.get("judge", {}) or {}
+    eval_mode = judge_cfg.get("mode", "both")  # "memory" | "behavioral" | "both"
+    judge_provider_name = judge_cfg.get("judge_llm_provider", None)
     metrics = run_cfg.get("metrics")  # Optional: ["intentionality", "secrecy", "mechanism", "coherence"]
     first_mover = run_cfg.get("first_mover", "player")
 
-    # Provider names defined in config.yaml
+    # Provider defaults (for legacy/simple agent specs)
     providers = run_cfg.get("providers", {})
     MAIN_LLM_NAME = providers.get("main", "qwen3_14b_local")
-    DISTILL_LLM_NAME = providers.get("distill", MAIN_LLM_NAME)
     PLAYER_LLM_NAME = providers.get("player", MAIN_LLM_NAME)
-    JUDGE_LLM_NAME = providers.get("judge", MAIN_LLM_NAME)
-    
-    # 1. Load LLM Providers Once
+    DEFAULT_JUDGE_LLM_NAME = providers.get("judge", MAIN_LLM_NAME)
+
+    # 1. Load default/shared LLM Providers once
     print("--- 🧪 Initializing Experiment ---")
     try:
-        main_llm = load_llm_provider(PROVIDERS_CONFIG_PATH, provider_name=MAIN_LLM_NAME)
-        distill_llm = load_llm_provider(PROVIDERS_CONFIG_PATH, provider_name=DISTILL_LLM_NAME)
-        player_llm = load_llm_provider(PROVIDERS_CONFIG_PATH, provider_name=PLAYER_LLM_NAME)
-        judge_llm = load_llm_provider(PROVIDERS_CONFIG_PATH, provider_name=JUDGE_LLM_NAME)
+        main_llm_default = load_llm_provider(PROVIDERS_CONFIG_PATH, MAIN_LLM_NAME)
+        player_llm = load_llm_provider(PROVIDERS_CONFIG_PATH, PLAYER_LLM_NAME)
+        judge_llm_name = judge_provider_name or DEFAULT_JUDGE_LLM_NAME
+        judge_llm = load_llm_provider(PROVIDERS_CONFIG_PATH, judge_llm_name)
         print("✅ All LLM Providers initialized successfully.")
     except Exception as e:
         print(f"❌ Failed to initialize LLM Providers: {e}. Exiting.")
@@ -71,9 +124,22 @@ def run_experiments():
         sys.exit(1)
 
     # 2. Main Experiment Loop
-    for agent_name in agents_to_test:
+    for agent_spec in agents_to_test:
+        # Determine readable agent name for logging/results path
+        if isinstance(agent_spec, str):
+            agent_name = agent_spec
+        elif isinstance(agent_spec, dict) and len(agent_spec) == 1:
+            key, val = next(iter(agent_spec.items()))
+            if isinstance(val, dict) and "name" in val:
+                agent_name = val["name"]
+            else:
+                agent_name = key
+        else:
+            print(f"❌ Invalid agent spec in config: {agent_spec}. Skipping.")
+            continue
+
         print(f"\n{'='*25} Starting Experiment Run for: {agent_name} {'='*25}")
-        
+
         # Create a dedicated results directory for this agent
         agent_results_dir = os.path.join(base_results_dir, agent_name)
         os.makedirs(agent_results_dir, exist_ok=True)
@@ -87,26 +153,30 @@ def run_experiments():
         if completed_trials >= num_trials:
             print(f"✅ Agent {agent_name} already has {completed_trials} trials completed. Skipping.")
             continue
-        
+
         print(f"▶️  Found {completed_trials} existing trials. Starting from trial {completed_trials + 1}.")
-        
+
         # Use tqdm for a progress bar over the trials
         needed_trials = num_trials - completed_trials
         for i in tqdm(range(needed_trials), desc=f"Agent: {agent_name}", unit="trial"):
             try:
                 # 3. Instantiate fresh components for each trial
-                agent = create_agent(agent_name, main_llm, distill_llm)
+                agent = _instantiate_agent_from_spec(
+                    agent_spec=agent_spec,
+                    providers_config_path=PROVIDERS_CONFIG_PATH,
+                    default_main=main_llm_default,
+                )
                 player = LLMPlayer(llm_provider=player_llm)
                 # create a fresh game each trial to reset any internal prints
                 game = create_game(normalized_game)[0]
 
-                # Initialize LLMJudge for this game. Mode here is informational; prompts are selected per-call.
+                # Initialize LLMJudge for this game (prompts are selected per-call).
                 llm_judge = LLMJudge(
                     judge_llm_provider=judge_llm,
                     game=normalized_game,
-                    mode="behavioral",
+                    mode=eval_mode if isinstance(eval_mode, str) else "both",
                 )
-                
+
                 # 4. Initialize and run the Game Loop Controller
                 controller = GameLoopController(
                     agent=agent,
@@ -116,8 +186,8 @@ def run_experiments():
                     max_turns=max_turns,
                     results_dir=agent_results_dir
                 )
-                controller.run(first_mover=first_mover, eval_modes=eval_modes, metrics=metrics)
-            
+                controller.run(first_mover=first_mover, eval_mode=eval_mode, metrics=metrics)
+
             except Exception as e:
                 print(f"\n--- ❌ ERROR on trial {i+1} for {agent_name}: {e} ---")
                 # Log the error and continue to the next trial
@@ -128,12 +198,9 @@ def run_experiments():
                     f.write(f"Error: {e}\n---\n")
                 continue
 
-
-
     print(f"\n{'='*30} ✅ All Experiments Finished {'='*30}")
     print(f"Results saved in: {base_results_dir}")
 
+
 if __name__ == "__main__":
     run_experiments()
-
-

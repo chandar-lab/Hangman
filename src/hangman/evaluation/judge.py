@@ -45,7 +45,7 @@ class LLMJudge:
         self,
         judge_llm_provider: LLMProvider,
         game: str,
-        mode: Literal["behavioral", "memory"] = "behavioral",
+        mode: Literal["behavioral", "memory", "both"] = "behavioral",
     ) -> None:
         if not isinstance(judge_llm_provider, LLMProvider):
             raise TypeError("judge_llm_provider must be an instance of LLMProvider.")
@@ -54,7 +54,6 @@ class LLMJudge:
         self.game = game
         self.mode = mode
         self.parser = PydanticOutputParser(pydantic_object=MetricEvaluation)
-        # Do not prefetch prompts here; resolve per-call so include_private can remap mode
         logging.info(
             f"LLMJudge initialized for game='{self.game}', mode='{self.mode}', model={self.llm.config.get('model_name')}"
         )
@@ -145,67 +144,69 @@ class LLMJudge:
         self,
         trial_data: Dict[str, Any],
         metrics: Optional[List[str]] = None,
-        include_private: Optional[bool] = None,
-        extra_context: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Evaluate the given trial JSON using the selected (game, mode) prompts.
 
         metrics: subset of [intentionality, secrecy, mechanism, coherence]. If None, evaluate all.
-        include_private: overrides whether to include agent private memory in the prompt log.
-        extra_context: reserved for future use (prepend to prompt if needed).
         """
         if "interaction_log" not in trial_data:
             raise ValueError("Trial data must contain an 'interaction_log' key.")
 
         full_log: List[List[Any]] = trial_data["interaction_log"]
         chosen_metrics = metrics or ["intentionality", "secrecy", "mechanism", "coherence"]
-        include_private_eff = (
-            include_private if include_private is not None else (self.mode == "memory")
-        )
 
-        # Map include_private flag to prompt mode: True -> memory, False -> behavioral
-        effective_mode = "memory" if include_private_eff else "behavioral"
-        prompt_bundle = get_prompts(self.game, effective_mode)
-        metric_prompts = prompt_bundle["metrics"]
-        format_instructions = prompt_bundle["format_instructions"]
+        def _run_for_mode(effective_mode: Literal["behavioral", "memory"]) -> Dict[str, Any]:
+            include_private = (effective_mode == "memory")
+            prompt_bundle = get_prompts(self.game, effective_mode)
+            metric_prompts = prompt_bundle["metrics"]
+            format_instructions = prompt_bundle["format_instructions"]
 
-        results: Dict[str, Any] = {}
+            results_local: Dict[str, Any] = {}
 
-        if "intentionality" in chosen_metrics and "intentionality" in metric_prompts:
-            logging.info("Evaluating 'Intentionality'...")
-            results["intentionality"] = self._evaluate_metric(
-                prompt_template=metric_prompts["intentionality"],
-                log_segment=full_log[:2],  # early-turn signal
-                include_private=include_private_eff,
-                format_instructions=format_instructions,
-            )
+            if "intentionality" in chosen_metrics and "intentionality" in metric_prompts:
+                logging.info(f"Evaluating 'Intentionality' ({effective_mode})...")
+                results_local["intentionality"] = self._evaluate_metric(
+                    prompt_template=metric_prompts["intentionality"],
+                    log_segment=full_log[:2],  # early-turn signal
+                    include_private=include_private,
+                    format_instructions=format_instructions,
+                )
 
-        if "secrecy" in chosen_metrics and "secrecy" in metric_prompts:
-            logging.info("Evaluating 'Secrecy'...")
-            results["secrecy"] = self._evaluate_metric(
-                prompt_template=metric_prompts["secrecy"],
-                log_segment=full_log,
-                include_private=include_private_eff,
-                format_instructions=format_instructions,
-            )
+            if "secrecy" in chosen_metrics and "secrecy" in metric_prompts:
+                logging.info(f"Evaluating 'Secrecy' ({effective_mode})...")
+                results_local["secrecy"] = self._evaluate_metric(
+                    prompt_template=metric_prompts["secrecy"],
+                    log_segment=full_log,
+                    include_private=include_private,
+                    format_instructions=format_instructions,
+                )
 
-        if "mechanism" in chosen_metrics and "mechanism" in metric_prompts:
-            logging.info("Evaluating 'Mechanism'...")
-            results["mechanism"] = self._evaluate_metric(
-                prompt_template=metric_prompts["mechanism"],
-                log_segment=full_log,
-                include_private=include_private_eff,
-                format_instructions=format_instructions,
-            )
+            if "mechanism" in chosen_metrics and "mechanism" in metric_prompts:
+                logging.info(f"Evaluating 'Mechanism' ({effective_mode})...")
+                results_local["mechanism"] = self._evaluate_metric(
+                    prompt_template=metric_prompts["mechanism"],
+                    log_segment=full_log,
+                    include_private=include_private,
+                    format_instructions=format_instructions,
+                )
 
-        if "coherence" in chosen_metrics and "coherence" in metric_prompts:
-            logging.info("Evaluating 'Conversational Coherence'...")
-            results["coherence"] = self._evaluate_metric(
-                prompt_template=metric_prompts["coherence"],
-                log_segment=full_log,
-                include_private=include_private_eff,
-                format_instructions=format_instructions,
-            )
+            if "coherence" in chosen_metrics and "coherence" in metric_prompts:
+                logging.info(f"Evaluating 'Conversational Coherence' ({effective_mode})...")
+                results_local["coherence"] = self._evaluate_metric(
+                    prompt_template=metric_prompts["coherence"],
+                    log_segment=full_log,
+                    include_private=include_private,
+                    format_instructions=format_instructions,
+                )
 
-        return results
+            return results_local
+
+        # If the judge is asked to produce both views, ignore include_private and return both.
+        if self.mode == "both":
+            return {
+                "behavioral": _run_for_mode("behavioral"),
+                "memory": _run_for_mode("memory"),
+            }
+
+        return {self.mode: _run_for_mode(self.mode)}    

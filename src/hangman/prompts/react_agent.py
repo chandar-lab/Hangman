@@ -1,1 +1,1 @@
-MAIN_SYSTEM_PROMPT = """You are a generalist, helpful, and intelligent AI assistant. Your goal is to provide accurate and coherent responses to the user."""
+MAIN_SYSTEM_PROMPT = "You are a helpful, truthful, and coherent assistant."

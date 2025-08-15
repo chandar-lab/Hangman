@@ -1,6 +1,6 @@
 import os
 import yaml
-from typing import List, Any, Dict
+from typing import List
 
 # --- Core LangChain/LangGraph Imports ---
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
@@ -11,35 +11,37 @@ from typing_extensions import TypedDict
 # --- Project-Specific Imports ---
 from hangman.agents.base_agent import BaseAgent, ModelOutput
 from hangman.providers.llmprovider import LLMProvider, load_llm_provider
-from hangman.prompts.reakeeact_agent import MAIN_SYSTEM_PROMPT
+from hangman.prompts.private_cot_agent import MAIN_SYSTEM_PROMPT
 
-# --- Agent State Definition ---
 
 class AgentState(TypedDict):
     """
-    Represents the state for the ReaKeeActAgent.
+    Represents the state for the PrivateCoTAgent.
     """
     # The public conversation messages
     messages: List[BaseMessage]
-    
+
     # A string containing all past reasoning traces, separated by a delimiter.
     working_memory: str
-    
+
     # The public-facing response for the current turn
     response: str
-    
+
     # The private thinking trace for the current turn
     thinking: str
+
 
 # A unique delimiter to separate thoughts in the working memory string
 THOUGHT_DELIMITER = "\n<END_OF_THOUGHT>\n"
 
-class ReaKeeActAgent(BaseAgent):
+
+class PrivateCoTAgent(BaseAgent):
     """
-    An agent that uses a "Reason-Keep-Act" cycle.
+    An agent that uses a "Private Chain-of-Thought" cycle.
     It generates a reasoning trace ("thinking"), acts on it, and then
     appends that trace to its working memory for future turns.
     """
+
     def __init__(self, main_llm_provider: LLMProvider):
         # This agent only needs one LLM provider.
         super().__init__(llm_provider=main_llm_provider)
@@ -67,12 +69,12 @@ class ReaKeeActAgent(BaseAgent):
         message history to provide full context to the LLM.
         """
         print("---NODE: GENERATING RESPONSE---")
-        
+
         # Reconstruct the prompt with interleaved reasoning
         past_thoughts = state["working_memory"].split(THOUGHT_DELIMITER)
-        interleaved_messages = []
+        interleaved_messages: List[BaseMessage] = []
         thought_idx = 0
-        
+
         for msg in state["messages"]:
             if isinstance(msg, HumanMessage):
                 interleaved_messages.append(msg)
@@ -80,7 +82,7 @@ class ReaKeeActAgent(BaseAgent):
                 # Before each AI message, insert its corresponding past thought
                 if thought_idx < len(past_thoughts) and past_thoughts[thought_idx]:
                     thought_content = f"<thinking>{past_thoughts[thought_idx]}</thinking>"
-                    # We represent the agent's past turn as a single AIMessage
+                    # Represent the agent's past turn as a single AIMessage
                     # containing both its thought and its final answer.
                     interleaved_content = f"{thought_content}\n{msg.content}"
                     interleaved_messages.append(AIMessage(content=interleaved_content))
@@ -90,10 +92,10 @@ class ReaKeeActAgent(BaseAgent):
                 thought_idx += 1
 
         messages = [SystemMessage(content=MAIN_SYSTEM_PROMPT)] + interleaved_messages
-        
+
         # Use the main LLM provider to generate a new thought and response
         result = self.llm_provider.invoke(messages, thinking=True)
-        
+
         return {
             "thinking": result["thinking"],
             "response": result["response"],
@@ -102,7 +104,7 @@ class ReaKeeActAgent(BaseAgent):
     def _keep_reasoning_trace(self, state: AgentState) -> dict:
         """Appends the most recent thought to the working memory string."""
         print("---NODE: KEEPING REASONING TRACE---")
-        
+
         new_thought = state.get("thinking", "").strip()
         if not new_thought:
             return {}
@@ -126,7 +128,7 @@ class ReaKeeActAgent(BaseAgent):
         try:
             current_state = self.workflow.get_state(config=main_thread_config)
             current_working_memory = current_state.values.get("working_memory", "")
-        except:
+        except Exception:
             current_working_memory = ""
 
         # Create initial state for the new thread
@@ -141,10 +143,13 @@ class ReaKeeActAgent(BaseAgent):
         final_state = self.workflow.invoke(initial_state, config=thread_config)
 
         # Update the main thread with the results for persistence
-        self.workflow.update_state(main_thread_config, {
-            "messages": messages + [AIMessage(content=final_state["response"])],
-            "working_memory": final_state["working_memory"]
-        })
+        self.workflow.update_state(
+            main_thread_config,
+            {
+                "messages": messages + [AIMessage(content=final_state["response"])],
+                "working_memory": final_state["working_memory"],
+            },
+        )
 
         return {"response": final_state["response"], "thinking": final_state["thinking"]}
 
@@ -154,7 +159,7 @@ class ReaKeeActAgent(BaseAgent):
 
     def get_private_state(self) -> str:
         state_values = self.get_state()
-        memory = state_values.get('working_memory', 'N/A')
+        memory = state_values.get("working_memory", "")
         # thought = state_values.get('thinking', 'N/A') ## TODO: This does not work
         return memory
 
@@ -168,7 +173,7 @@ class ReaKeeActAgent(BaseAgent):
 # --- Runnable CLI for Direct Testing ---
 if __name__ == "__main__":
     CONFIG_PATH = "config.yaml"
-    with open(CONFIG_PATH, 'r') as f:
+    with open(CONFIG_PATH, "r") as f:
         config = yaml.safe_load(f)
 
     try:
@@ -177,27 +182,27 @@ if __name__ == "__main__":
         print("✅ LLM Provider loaded successfully.")
     except Exception as e:
         print(f"❌ Failed to load LLM Provider: {e}")
-        exit()
+        raise SystemExit(1)
 
-    agent = ReaKeeActAgent(main_llm_provider=main_llm)
-    print("🤖 ReaKeeActAgent Agent is ready. Type 'quit', 'exit', or 'q' to end.")
+    agent = PrivateCoTAgent(main_llm_provider=main_llm)
+    print("🤖 PrivateCoTAgent is ready. Type 'quit', 'exit', or 'q' to end.")
 
-    messages = []
+    messages: List[BaseMessage] = []
     while True:
         user_input = input("User > ")
         if user_input.lower() in ["quit", "exit", "q"]:
             print("Ending session.")
             break
-        
+
         messages.append(HumanMessage(content=user_input))
-        
+
         output = agent.invoke(messages)
-        
+
         messages.append(AIMessage(content=output["response"]))
-        
+
         print("\n---ANSWER---")
         print(f"AI: {output['response']}")
         print("\n---UPDATED WORKING MEMORY---")
         current_state = agent.get_state()
-        print(current_state['working_memory'])
-        print("\n" + "="*50 + "\n")
+        print(current_state["working_memory"])
+        print("\n" + "=" * 50 + "\n")

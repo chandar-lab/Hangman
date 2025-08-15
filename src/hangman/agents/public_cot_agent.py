@@ -66,7 +66,7 @@ class PublicCoTAgent(BaseAgent):
         return {}
 
     def get_private_state(self) -> str:
-        return "N/A"
+        return ""
 
     def reset(self) -> None:
         # No persistent state to reset

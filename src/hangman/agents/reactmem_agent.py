@@ -2,6 +2,7 @@ import os
 import yaml
 import json
 from typing import List, Any, Dict, Optional
+import warnings
 
 # --- Core LangChain/LangGraph Imports ---
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
@@ -15,9 +16,8 @@ from typing_extensions import TypedDict
 from hangman.agents.base_agent import BaseAgent, ModelOutput
 from hangman.providers.llmprovider import LLMProvider, load_llm_provider
 
-from hangman.tools.update_memory import update_memory
-from hangman.tools import format_e2b_output_to_str
-from hangman.prompts.react_agent import MAIN_SYSTEM_PROMPT
+from hangman.tools import format_e2b_output_to_str, patch_memory, replace_in_memory, delete_from_memory, append_in_memory, overwrite_memory
+from hangman.prompts.reactmem_agent import MAIN_SYSTEM_PROMPT, INITIAL_WORKING_MEMORY
 
 # --- Agent State and Class Definition ---
 
@@ -34,12 +34,27 @@ class ReActMemAgent(BaseAgent):
     An agent that uses the ReAct (Reason+Act) paradigm.
     Its only tool is the ability to edit its own working memory.
     """
-    def __init__(self, main_llm_provider: LLMProvider, tools: Optional[List[Any]] = None):
+    def __init__(self, main_llm_provider: LLMProvider, tools: Optional[List[Any]] = None, strategy: str = "overwrite"):
         """Memoryful ReAct agent that accepts a pre-initialized tool list.
 
-        If tools is None, defaults to [update_memory].
+        If tools is None, defaults to [patch_memory, replace_in_memory].
         """
-        self.tools = tools or [update_memory]
+        if tools is None and strategy is None:
+            raise ValueError("Either tools or strategy must be provided.")
+        if tools is not None and strategy is not None:
+            warnings.warn("Both tools and strategy are provided. The strategy will be ignored. Using tools.")
+        if tools:
+            self.tools = tools
+        else:
+            if strategy == "overwrite":
+                self.tools = [overwrite_memory]
+            elif strategy == "patch_and_replace":
+                self.tools = [patch_memory, replace_in_memory]
+            elif strategy == "delete_and_append":
+                self.tools = [delete_from_memory, append_in_memory]
+            else:
+                raise ValueError("Invalid strategy. Must be one of: overwrite, patch_and_replace, delete_and_append.")
+
         self.tools_by_name = {t.name: t for t in self.tools}
         self._has_code_tool = "code_interpreter" in self.tools_by_name
 
@@ -135,52 +150,163 @@ class ReActMemAgent(BaseAgent):
         }
         
     def _tool_node(self, state: AgentState) -> Dict[str, Any]:
-        """Executes tools and updates state, handling side-effects per tool."""
-        tool_call = state["messages"][-1].tool_calls[0]
-        tool = self.tools_by_name[tool_call["name"]]
-        tool_args = dict(tool_call["args"])
+        """Executes one or more tool calls in the last assistant message, sequentially."""
+        last_msg = state["messages"][-1]
+        tool_calls = getattr(last_msg, "tool_calls", []) or []
 
-        # Memory updater
-        if tool.name == "update_memory":
-            tool_args["current_memory"] = state.get("working_memory", "")
-            new_memory = tool.invoke(tool_args)
-            tool_message = ToolMessage(
-                content="Successfully updated working memory.",
-                name=tool_call["name"],
-                tool_call_id=tool_call["id"],
-            )
-            # Append tool message to the running conversation for this turn
-            return {"working_memory": new_memory, "messages": state["messages"] + [tool_message]}
+        if not tool_calls:
+            return {"working_memory": state.get("working_memory", ""), "messages": state["messages"]}
 
-        # Web search (pure)
-        if tool.name == "web_search":
-            result = tool.invoke(tool_args)
-            tool_message = ToolMessage(
-                content=result,
-                name=tool_call["name"],
-                tool_call_id=tool_call["id"],
-            )
-            return {"messages": state["messages"] + [tool_message]}
+        # We'll mutate this as each tool applies
+        working_mem = state.get("working_memory", "")
+        out_msgs = list(state["messages"])
 
-        # Code interpreter (updates sandbox_files)
-        if tool.name == "code_interpreter":
-            observation = tool.invoke(tool_args)
-            content_str = format_e2b_output_to_str(observation)
-            tool_message = ToolMessage(
-                content=content_str,
-                name=tool_call["name"],
-                tool_call_id=tool_call["id"],
-            )
-            return {"messages": state["messages"] + [tool_message], "sandbox_files": observation.get("files", [])}
+        for tool_call in tool_calls:
+            tool = self.tools_by_name[tool_call["name"]]
+            tool_args = dict(tool_call["args"] or {})
+            tool_args["current_memory"] = working_mem  # inject the latest memory
 
-        # Fallback
-        result = tool.invoke(tool_args)
-        tool_message = ToolMessage(
-            content=str(result),
-            name=tool_call["name"],
-            tool_call_id=tool_call["id"],
-        )
-        return {"messages": state["messages"] + [tool_message]}
+            if tool.name == "overwrite_memory":
+                try:
+                    new_memory = tool.invoke(tool_args)
+                except Exception as e:
+                    tool_message = ToolMessage(
+                        content=f"overwrite_memory failed: {e}",
+                        name=tool_call["name"],
+                        tool_call_id=tool_call["id"],
+                    )
+                    out_msgs.append(tool_message)
+                    working_mem = state.get("working_memory", "")
+                    continue
+
+                tool_message = ToolMessage(
+                    content="overwrite_memory successfully applied.",
+                    name=tool_call["name"],
+                    tool_call_id=tool_call["id"],
+                )
+                out_msgs.append(tool_message)
+                working_mem = new_memory
+
+            if tool.name == "delete_from_memory":
+                tool_args["current_memory"] = state.get("working_memory", "")
+
+                try:
+                    new_memory = tool.invoke(tool_args)
+                except Exception as e:
+                    tool_message = ToolMessage(
+                        content=f"delete_from_memory failed: {e}",
+                        name=tool_call["name"],
+                        tool_call_id=tool_call["id"],
+                    )
+                    out_msgs.append(tool_message)
+                    working_mem = state.get("working_memory", "")
+                    continue
+
+                tool_message = ToolMessage(
+                    content="delete_from_memory successfully applied.",
+                    name=tool_call["name"],
+                    tool_call_id=tool_call["id"],
+                )
+                out_msgs.append(tool_message)
+                working_mem = new_memory
+
+            if tool.name == "append_in_memory":
+                tool_args["current_memory"] = state.get("working_memory", "")
+
+                try:
+                    new_memory = tool.invoke(tool_args)
+                except Exception as e:
+                    tool_message = ToolMessage(
+                        content=f"append_in_memory failed: {e}",
+                        name=tool_call["name"],
+                        tool_call_id=tool_call["id"],
+                    )
+                    out_msgs.append(tool_message)
+                    working_mem = state.get("working_memory", "")
+                    continue
+
+                tool_message = ToolMessage(
+                    content="append_in_memory successfully applied.",
+                    name=tool_call["name"],
+                    tool_call_id=tool_call["id"],
+                )
+                out_msgs.append(tool_message)
+                working_mem = new_memory
+
+            if tool.name in ("patch_memory", "replace_in_memory"):
+                tool_args["current_memory"] = state.get("working_memory", "")
+
+                try:
+                    result = tool.invoke(tool_args)
+                except Exception as e:
+                    tool_message = ToolMessage(
+                        content=f"{tool.name} failed: {e}",
+                        name=tool_call["name"],
+                        tool_call_id=tool_call["id"],
+                    )
+                    out_msgs.append(tool_message)
+                    working_mem = state.get("working_memory", "")
+                    continue
+
+                if isinstance(result, dict) and "new_memory" in result:
+                    new_memory = result["new_memory"]
+                elif isinstance(result, str):
+                    new_memory = result
+                else:
+                    tool_message = ToolMessage(
+                        content=f"{tool.name} returned unexpected result shape; no changes applied.",
+                        name=tool_call["name"],
+                        tool_call_id=tool_call["id"],
+                    )
+                    out_msgs.append(tool_message)
+                    working_mem = state.get("working_memory", "")
+                    continue
+
+                tool_message = ToolMessage(
+                    content=f"{tool.name} successfully applied.",
+                    name=tool_call["name"],
+                    tool_call_id=tool_call["id"],
+                )
+                out_msgs.append(tool_message)
+                working_mem = new_memory
+
+            # Web search (pure)
+            if tool.name == "web_search":
+                result = tool.invoke(tool_args)
+                tool_message = ToolMessage(
+                    content=result,
+                    name=tool_call["name"],
+                    tool_call_id=tool_call["id"],
+                )
+                out_msgs.append(tool_message)
+                working_mem = result
+
+            # Code interpreter (updates sandbox_files)
+            if tool.name == "code_interpreter":
+                observation = tool.invoke(tool_args)
+                content_str = format_e2b_output_to_str(observation)
+                tool_message = ToolMessage(
+                    content=content_str,
+                    name=tool_call["name"],
+                    tool_call_id=tool_call["id"],
+                )
+                out_msgs.append(tool_message)
+                working_mem = observation.get("files", [])
+
+            # Fallback
+            # result = tool.invoke(tool_args)
+            # tool_message = ToolMessage(
+            #     content=str(result),
+            #     name=tool_call["name"],
+            #     tool_call_id=tool_call["id"],
+            # )
+            # out_msgs.append(tool_message)
+            # working_mem = result
+
+        return {
+            "messages": out_msgs,
+            "working_memory": working_mem,
+        }
 
     def invoke(self, messages: List[BaseMessage]) -> ModelOutput:
         """
@@ -195,10 +321,10 @@ class ReActMemAgent(BaseAgent):
         # 1. Get the last known working memory (and sandbox files, if any) from the persistent main thread
         try:
             current_state = self.get_state()  # Gets state from "main_thread"
-            current_working_memory = current_state.get("working_memory", "")
+            current_working_memory = current_state.get("working_memory", INITIAL_WORKING_MEMORY)
             current_sandbox_files = current_state.get("sandbox_files", [])
         except Exception:
-            current_working_memory = ""
+            current_working_memory = INITIAL_WORKING_MEMORY
             current_sandbox_files = []
         
         # 2. Invoke the graph in the temporary thread.
@@ -225,7 +351,7 @@ class ReActMemAgent(BaseAgent):
         persisted_messages = prior_msgs + pruned_turn_msgs
 
         update_payload: Dict[str, Any] = {
-            "working_memory": final_state.get("working_memory", ""),
+            "working_memory": final_state.get("working_memory", INITIAL_WORKING_MEMORY),
             "messages": persisted_messages,
         }
         if self._has_code_tool:
@@ -272,12 +398,12 @@ class ReActMemAgent(BaseAgent):
 
     def get_private_state(self) -> str:
         state = self.get_state()
-        memory = state.get('working_memory', 'N/A')
+        memory = state.get('working_memory', '')
         return memory
 
     def reset(self) -> None:
         """Resets the agent by clearing the main thread's state."""
-        empty_state: AgentState = AgentState(messages=[], working_memory="", thinking="")
+        empty_state: AgentState = AgentState(messages=[], working_memory=INITIAL_WORKING_MEMORY, thinking="")
         if self._has_code_tool:
             empty_state["sandbox_files"] = []
         self.workflow.update_state({"configurable": {"thread_id": "main_thread"}}, empty_state)
@@ -301,7 +427,7 @@ if __name__ == "__main__":
         print(f"❌ Failed to load LLM Provider: {e}")
         exit()
 
-    agent = ReActMemAgent(main_llm_provider=main_llm)
+    agent = ReActMemAgent(main_llm_provider=main_llm, strategy="overwrite")
     print("🤖 ReActMemAgent is ready. Type 'quit', 'exit', or 'q' to end.")
 
     messages = []

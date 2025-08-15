@@ -15,7 +15,7 @@ def update_memory(deletions: List[int], insertions: List[str], current_memory: O
         insertions: A list of new strings to add to the end of the memory.
     
     Returns:
-        The newly formatted working memory string.
+        The updated working memory string.
     """
     print(f"---TOOL: update_memory---")
     print(f"Deletions: {deletions}, Insertions: {insertions}")
