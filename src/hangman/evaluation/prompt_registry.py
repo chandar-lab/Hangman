@@ -20,6 +20,7 @@ def _load_game_module(game_key: str):
         "20-questions": "hangman.prompts.twenty_questions",
         "twenty_questions": "hangman.prompts.twenty_questions",
         "twenty-questions": "hangman.prompts.twenty_questions",
+        "20_questions": "hangman.prompts.twenty_questions",
         "zendo": "hangman.prompts.zendo",
         "diagnosis": "hangman.prompts.diagnosis_simulator",
         "diagnosis_simulator": "hangman.prompts.diagnosis_simulator",
@@ -31,7 +32,7 @@ def _load_game_module(game_key: str):
     return import_module(mapping[key])
 
 
-def _resolve_prompts_for_mode(mod, mode: str) -> Dict[str, str]:
+def _resolve_prompts_for_mode(mod, mode: str, game_name: str) -> Dict[str, str]:
     fmt = getattr(mod, "FORMAT_INSTRUCTIONS")
 
     # Memory-only metrics
@@ -72,7 +73,25 @@ def _resolve_prompts_for_mode(mod, mode: str) -> Dict[str, str]:
         if coherence_beh:
             metrics["coherence"] = coherence_beh
 
-    return {"metrics": metrics, "format_instructions": fmt}
+    # Augment behavioral prompts with the game-agnostic winner prompt
+    winner_fmt = None
+    if mode == "behavioral":
+        try:
+            winner_mod = import_module("hangman.prompts.winner")
+            winner_prompt = getattr(winner_mod, "WINNER_JUDGE_PROMPT", None)
+            winner_fmt = getattr(winner_mod, "WINNER_FORMAT_INSTRUCTIONS", None)
+            if winner_prompt:
+                # Inject the game name without touching other placeholders
+                metrics["winner"] = winner_prompt.replace("{game_name}", game_name)
+        except Exception:
+            # If winner prompt is not available, silently skip to preserve compatibility
+            pass
+
+    # Note: Return dedicated winner format instructions separately to avoid schema conflicts
+    bundle = {"metrics": metrics, "format_instructions": fmt}
+    if winner_fmt is not None:
+        bundle["winner_format_instructions"] = winner_fmt
+    return bundle
 
 
 def get_prompts(game: str, mode: str) -> Dict[str, str]:
@@ -80,4 +99,4 @@ def get_prompts(game: str, mode: str) -> Dict[str, str]:
     mode_key = mode.strip().lower()
     if mode_key not in {"memory", "behavioral"}:
         raise ValueError("mode must be 'memory' or 'behavioral'")
-    return _resolve_prompts_for_mode(mod, mode_key)
+    return _resolve_prompts_for_mode(mod, mode_key, game)

@@ -1,6 +1,7 @@
 import sys
 import os
 import yaml
+import argparse
 import inspect
 from datetime import datetime
 from tqdm import tqdm
@@ -69,13 +70,17 @@ def _instantiate_agent_from_spec(
 
 # --- Main Experiment Runner ---
 
-def run_experiments():
+def run_experiments(
+    run_config_path: str = "./config/games_run.yaml",
+    providers_config_path: str = "./config/config.yaml",
+):
     """
     Main function to configure and run the batch of experiments.
     """
     # --- Experiment Configuration ---
-    PROVIDERS_CONFIG_PATH = "config.yaml"
-    RUN_CONFIG_PATH = os.environ.get("RUN_CONFIG", "games_run.yaml")
+    # Paths are provided via function arguments (CLI can override), with sensible defaults
+    RUN_CONFIG_PATH = run_config_path
+    PROVIDERS_CONFIG_PATH = providers_config_path
 
     # --- Load run configuration ---
     try:
@@ -100,7 +105,7 @@ def run_experiments():
 
     # Provider defaults (for legacy/simple agent specs)
     providers = run_cfg.get("providers", {})
-    MAIN_LLM_NAME = providers.get("main", "qwen3_14b_local")
+    MAIN_LLM_NAME = providers.get("main", "qwen3_14b_local_vllm_native")
     PLAYER_LLM_NAME = providers.get("player", MAIN_LLM_NAME)
     DEFAULT_JUDGE_LLM_NAME = providers.get("judge", MAIN_LLM_NAME)
 
@@ -203,4 +208,19 @@ def run_experiments():
 
 
 if __name__ == "__main__":
-    run_experiments()
+    parser = argparse.ArgumentParser(description="Run Hangman experiments from a YAML run config")
+    parser.add_argument(
+        "--run-config",
+        "-r",
+        default=os.environ.get("RUN_CONFIG", "./config/games_run.yaml"),
+        help="Path to the YAML run configuration file (default: ./config/games_run.yaml or RUN_CONFIG env)",
+    )
+    parser.add_argument(
+        "--providers-config",
+        "-p",
+        default="./config/config.yaml",
+        help="Path to providers config YAML used to resolve LLM providers (default: ./config/config.yaml)",
+    )
+    args = parser.parse_args()
+
+    run_experiments(run_config_path=args.run_config, providers_config_path=args.providers_config)

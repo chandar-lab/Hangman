@@ -7,7 +7,6 @@ from typing_extensions import TypedDict
 from dotenv import load_dotenv
 from langchain_core.messages import BaseMessage
 from langchain_openai import ChatOpenAI
-from .vllm_client import ChatVllm
 
 # --- Setup ---
 load_dotenv()
@@ -25,21 +24,12 @@ class APIConfig(TypedDict):
 class GenerationConfig(TypedDict):
     temperature: float
     max_tokens: int
-    # Optional two-pass controls for vLLM native backend
-    two_pass: Optional[bool]
-    think_tag: Optional[Literal["think", "thinking"]]
-    max_thinking_tokens: Optional[int]
-    max_response_tokens: Optional[int]
 
 class ProviderConfig(TypedDict):
     name: str
     model_name: str
     # NEW: This key determines how to parse the model's output.
     parsing_format: Optional[Literal["think_tags", "direct_response"]]
-    # Backend selection: "openai" (ChatOpenAI over HTTP) or "vllm_native" (custom HTTP server)
-    provider_backend: Optional[Literal["openai", "vllm_native"]]
-    # How tools are formatted/parsed (primarily relevant for vLLM native or servers with Hermes)
-    tool_parser: Optional[Literal["openai", "hermes"]]
     api_config: APIConfig
     generation_config: GenerationConfig
 
@@ -54,29 +44,9 @@ class LLMProvider:
         self.client = self._create_client()
 
     def _create_client(self) -> Any:
-        backend = self.config.get("provider_backend", "openai")
+        # This factory handles any OpenAI-compatible API (vLLM, OpenRouter, etc.)
         api_key_env = self.config["api_config"].get("api_key_env")
         base_url = self.config["api_config"].get("base_url")
-
-        gen_cfg = self.config.get("generation_config", {})
-        temperature = gen_cfg.get("temperature", 0.7)
-        max_tokens = gen_cfg.get("max_tokens", 4096)
-
-        if backend == "vllm_native":
-            # Use our native client that talks to the custom server
-            return ChatVllm(
-                model_name=self.config["model_name"],
-                base_url=base_url,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                tool_parser=self.config.get("tool_parser", "hermes") or "hermes",
-                two_pass=bool(gen_cfg.get("two_pass", True)),
-                think_tag=gen_cfg.get("think_tag", "think") or "think",
-                max_thinking_tokens=int(gen_cfg.get("max_thinking_tokens", 256)),
-                max_response_tokens=int(gen_cfg.get("max_response_tokens", 1024)),
-            )
-
-        # Default: OpenAI-compatible HTTP client (vLLM OpenAI server, OpenRouter, etc.)
         api_key = os.environ.get(api_key_env) if api_key_env else None
 
         # Allow missing API key for localhost endpoints (common for local vLLM servers)
@@ -95,8 +65,8 @@ class LLMProvider:
             model=self.config["model_name"],
             base_url=base_url,
             api_key=api_key or "",  # Some OpenAI-compatible servers accept empty tokens for local use
-            temperature=temperature,
-            max_tokens=max_tokens,
+            temperature=self.config["generation_config"].get("temperature", 0.7),
+            max_tokens=self.config["generation_config"].get("max_tokens", 4096),
         )
 
     def _parse_with_think_tags(self, text: str) -> ModelOutput:

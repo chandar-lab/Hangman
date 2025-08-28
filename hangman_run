@@ -1,0 +1,48 @@
+#!/bin/bash
+#SBATCH --job-name=run_hangman
+#SBATCH --output=logs/output/experiment-%A.%a.out
+#SBATCH --error=logs/error/experiment-%A.%a.err
+#SBATCH --time=0-03:00:00
+#SBATCH --nodes=1
+#SBATCH --gpus-per-task=4
+#SBATCH --cpus-per-task=24
+#SBATCH --mem=0
+#SBATCH --ntasks-per-node=1
+#SBATCH --partition=short-unkillable
+#SBATCH --constraint=80gb               # constraints
+
+# Create directories for logs
+mkdir -p logs
+
+# Activate the virtual environment
+source .venv/bin/activate
+
+# --- 1. Start vLLM Server in the Background ---
+#    - Using --tensor-parallel-size 4 to utilize all 4 GPUs.
+#    - Using '&' to run it as a background process.
+echo "--- Starting vLLM Server ---"
+./run_qwen_vllm_native_server.sh &
+
+# Get the Process ID (PID) of the vLLM server
+VLLM_PID=$!
+echo "vLLM Server started with PID: $VLLM_PID"
+
+# --- 2. Wait for the Server to be Ready ---
+#    - This loop will try to connect to the server every 5 seconds.
+#    - The script will only proceed once the server responds successfully.
+echo "--- Waiting for vLLM server to be ready on port 8001 ---"
+while ! curl -s http://localhost:8001/health > /dev/null; do
+    echo "Server not yet available. Waiting 5 seconds..."
+    sleep 5
+done
+echo "✅ vLLM Server is ready."
+
+# --- 3. Run the Resumable Experiment Script ---
+echo "--- Starting Experiment Run ---"
+python run_experiment.py --run-config ./config/hangman_run.yaml
+
+# --- 4. Clean Up ---
+#    - After the experiment script finishes, kill the background vLLM server.
+echo "--- Experiment finished. Shutting down vLLM server. ---"
+kill $VLLM_PID
+wait $VLLM_PID # Wait for the process to terminate cleanly

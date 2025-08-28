@@ -184,7 +184,7 @@ if __name__ == "__main__":
     with open(CONFIG_PATH, "r") as f:
         yaml.safe_load(f)
 
-    main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local")
+    main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local_vllm_native")
     agent = ReActAgent(main_llm_provider=main_llm)
     print("ReActAgent (stateless) ready.")
     messages: List[BaseMessage] = []

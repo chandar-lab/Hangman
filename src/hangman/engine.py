@@ -247,10 +247,10 @@ if __name__ == "__main__":
     RESULTS_DIR = "results/hangman/test"
 
     # Define the names of the LLM providers to use from the config file
-    AGENT_MAIN_LLM = "qwen3_14b_local"
-    AGENT_DISTILL_LLM = "qwen3_14b_local"
-    PLAYER_LLM = "qwen3_14b_local"
-    JUDGE_LLM = "qwen3_14b_local" 
+    AGENT_MAIN_LLM = "qwen3_14b_local_vllm_native"
+    AGENT_DISTILL_LLM = "qwen3_14b_local_vllm_native"
+    PLAYER_LLM = "qwen3_14b_local_vllm_native"
+    JUDGE_LLM = "qwen3_14b_local_vllm_native" 
 
     print("--- 🧪 Starting Test Run ---")
 

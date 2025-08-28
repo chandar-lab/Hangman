@@ -406,8 +406,8 @@ if __name__ == "__main__":
         config = yaml.safe_load(f)
 
     try:
-        main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local")
-        update_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local")
+        main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_vllm_hermes")
+        update_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_vllm_hermes")
         print("✅ LLM Providers loaded successfully.")
     except Exception as e:
         print(f"❌ Failed to load LLM Providers: {e}")

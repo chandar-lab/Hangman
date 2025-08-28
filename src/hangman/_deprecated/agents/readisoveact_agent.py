@@ -165,8 +165,8 @@ if __name__ == "__main__":
 
     # --- Initialize Providers from Config ---
     try:
-        main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local")
-        distill_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local")
+        main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local_vllm_native")
+        distill_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local_vllm_native")
         print("✅ LLM Providers loaded successfully.")
     except Exception as e:
         print(f"❌ Failed to load LLM Providers: {e}")

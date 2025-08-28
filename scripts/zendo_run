@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=run_hangman
+#SBATCH --job-name=run_zendo
 #SBATCH --output=logs/output/experiment-%A.%a.out
 #SBATCH --error=logs/error/experiment-%A.%a.err
 #SBATCH --time=0-03:00:00
@@ -11,8 +11,10 @@
 #SBATCH --partition=short-unkillable
 #SBATCH --constraint=80gb               # constraints
 
+# Cd to project root
+cd /home/mila/b/baldelld/scratch/hangman
+
 # Create directories for logs
-export HF_HOME=$SCRATCH/LLM4CAD
 mkdir -p logs
 
 # Activate the virtual environment
@@ -22,14 +24,7 @@ source .venv/bin/activate
 #    - Using --tensor-parallel-size 4 to utilize all 4 GPUs.
 #    - Using '&' to run it as a background process.
 echo "--- Starting vLLM Server ---"
-python -m vllm.entrypoints.openai.api_server \
-    --model Qwen/Qwen3-14B \
-    --trust-remote-code \
-    --port 8000 \
-    --dtype bfloat16 \
-    --tensor-parallel-size 4 \
-    --enable-auto-tool-choice \
-    --tool-call-parser hermes &
+./run_qwen_vllm_native_server.sh &
 
 # Get the Process ID (PID) of the vLLM server
 VLLM_PID=$!
@@ -38,8 +33,8 @@ echo "vLLM Server started with PID: $VLLM_PID"
 # --- 2. Wait for the Server to be Ready ---
 #    - This loop will try to connect to the server every 5 seconds.
 #    - The script will only proceed once the server responds successfully.
-echo "--- Waiting for vLLM server to be ready on port 8000 ---"
-while ! curl -s http://localhost:8000/health > /dev/null; do
+echo "--- Waiting for vLLM server to be ready on port 8001 ---"
+while ! curl -s http://localhost:8001/health > /dev/null; do
     echo "Server not yet available. Waiting 5 seconds..."
     sleep 5
 done
@@ -47,10 +42,10 @@ echo "✅ vLLM Server is ready."
 
 # --- 3. Run the Resumable Experiment Script ---
 echo "--- Starting Experiment Run ---"
-python run_experiment.py
+python run_experiment.py --run-config ./config/zendo_run.yaml
 
 # --- 4. Clean Up ---
 #    - After the experiment script finishes, kill the background vLLM server.
 echo "--- Experiment finished. Shutting down vLLM server. ---"
 kill $VLLM_PID
-wait $VLLM_PID # Wait for the process to terminate cleanly
+wait $VLLM_PID # Wait for the process to terminate cleanly``

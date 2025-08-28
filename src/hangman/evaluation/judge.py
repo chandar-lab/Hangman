@@ -202,11 +202,78 @@ class LLMJudge:
 
             return results_local
 
-        # If the judge is asked to produce both views, ignore include_private and return both.
-        if self.mode == "both":
+        def _run_winner() -> Dict[str, Any]:
+            """Behavioral-only winner determination using the dedicated prompt and schema."""
+            prompt_bundle = get_prompts(self.game, "behavioral")
+            metric_prompts = prompt_bundle.get("metrics", {})
+            winner_prompt = metric_prompts.get("winner")
+            winner_format = prompt_bundle.get("winner_format_instructions", "")
+
+            if not winner_prompt:
+                # Fallback if prompt is missing
+                return {
+                    "winner": "Unknown",
+                    "reasoning": "Winner prompt unavailable.",
+                    "confidence": 0,
+                }
+
+            formatted_log = self._format_log_for_prompt(full_log, include_private=False)
+            prompt = winner_prompt.format(
+                interaction_log=formatted_log,
+                format_instructions=winner_format,
+            )
+
+            try:
+                response = self.llm.invoke([HumanMessage(content=prompt)])
+                llm_output_str = response.get("response", "")
+            except Exception as e:
+                logging.error(f"Winner judge model invocation failed: {e}")
+                return {
+                    "winner": "Unknown",
+                    "reasoning": f"Invocation error: {e}",
+                    "confidence": 0,
+                }
+
+            parsed = self._extract_json(llm_output_str)
+
+            # Minimal validation and normalization
+            allowed = {"Player", "Agent", "Unknown"}
+            winner_val = parsed.get("winner", "Unknown")
+            if not isinstance(winner_val, str) or winner_val not in allowed:
+                winner_val = "Unknown"
+
+            reasoning_val = parsed.get("reasoning", "")
+            if not isinstance(reasoning_val, str):
+                reasoning_val = str(reasoning_val)
+
+            confidence_val = parsed.get("confidence", 0)
+            try:
+                confidence_val = int(confidence_val)
+            except Exception:
+                confidence_val = 0
+            confidence_val = max(0, min(100, confidence_val))
+
             return {
-                "behavioral": _run_for_mode("behavioral"),
-                "memory": _run_for_mode("memory"),
+                "winner": winner_val,
+                "reasoning": reasoning_val,
+                "confidence": confidence_val,
             }
 
-        return {self.mode: _run_for_mode(self.mode)}    
+        # Winner is always behavioral; compute it once
+        winner_result = _run_winner()
+
+        # If the judge is asked to produce both views, return both, and include winner in behavioral
+        if self.mode == "both":
+            behavioral_results = _run_for_mode("behavioral")
+            behavioral_results["winner"] = winner_result
+            memory_results = _run_for_mode("memory")
+            return {"behavioral": behavioral_results, "memory": memory_results}
+
+        if self.mode == "behavioral":
+            behavioral_results = _run_for_mode("behavioral")
+            behavioral_results["winner"] = winner_result
+            return {"behavioral": behavioral_results}
+
+        # mode == "memory": still include a behavioral section for winner
+        memory_results = _run_for_mode("memory")
+        return {"memory": memory_results, "behavioral": {"winner": winner_result}}

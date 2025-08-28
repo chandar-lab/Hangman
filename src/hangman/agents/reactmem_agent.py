@@ -50,10 +50,10 @@ class ReActMemAgent(BaseAgent):
                 self.tools = [overwrite_memory]
             elif strategy == "patch_and_replace":
                 self.tools = [patch_memory, replace_in_memory]
-            elif strategy == "delete_and_append":
+            elif strategy == "append_and_delete":
                 self.tools = [delete_from_memory, append_in_memory]
             else:
-                raise ValueError("Invalid strategy. Must be one of: overwrite, patch_and_replace, delete_and_append.")
+                raise ValueError("Invalid strategy. Must be one of: overwrite, patch_and_replace, append_and_delete.")
 
         self.tools_by_name = {t.name: t for t in self.tools}
         self._has_code_tool = "code_interpreter" in self.tools_by_name
@@ -421,13 +421,13 @@ if __name__ == "__main__":
         config = yaml.safe_load(f)
 
     try:
-        main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local")
+        main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_vllm_hermes")
         print("✅ LLM Provider loaded successfully.")
     except Exception as e:
         print(f"❌ Failed to load LLM Provider: {e}")
         exit()
 
-    agent = ReActMemAgent(main_llm_provider=main_llm, strategy="overwrite")
+    agent = ReActMemAgent(main_llm_provider=main_llm, strategy="append_and_delete")
     print("🤖 ReActMemAgent is ready. Type 'quit', 'exit', or 'q' to end.")
 
     messages = []

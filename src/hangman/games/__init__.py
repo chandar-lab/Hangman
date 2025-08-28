@@ -19,7 +19,7 @@ def create_game(game_name: str):
     if name in ("hangman", "hg"):
         return HangmanGame(), "hangman"
     if name in ("20_questions", "20q", "twenty_questions"):
-        return TwentyQuestionsGame(), "20_questions"
+        return TwentyQuestionsGame(), "twenty_questions"
     if name == "zendo":
         return ZendoGame(), "zendo"
     if name in ("diagnosis", "diagnosis_simulator", "meddiag", "md"):

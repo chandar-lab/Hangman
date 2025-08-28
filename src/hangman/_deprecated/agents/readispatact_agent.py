@@ -187,8 +187,8 @@ if __name__ == "__main__":
     # This assumes you have providers named 'qwen_local' and 'kimi_k2_openrouter' in your config
     # You can change these names to match your config file.
     try:
-        main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local")
-        distill_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local")
+        main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local_vllm_native")
+        distill_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local_vllm_native")
         print("✅ LLM Providers loaded successfully.")
     except Exception as e:
         print(f"❌ Failed to load LLM Providers: {e}")

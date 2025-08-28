@@ -180,8 +180,8 @@ if __name__ == "__main__":
     parser.add_argument("--config-path", type=str, default="config.yaml", help="Path to the main project configuration file.")
     
     # --- LLM Provider Config ---
-    parser.add_argument("--main-llm-name", type=str, default="qwen3_14b_local", help="Name of the main LLM provider in config.yaml.")
-    parser.add_argument("--distill-llm-name", type=str, default="qwen3_14b_local", help="Name of the distillation LLM provider in config.yaml (if required by the agent).")
+    parser.add_argument("--main-llm-name", type=str, default="qwen3_14b_local_vllm_native", help="Name of the main LLM provider in config.yaml.")
+    parser.add_argument("--distill-llm-name", type=str, default="qwen3_14b_local_vllm_native", help="Name of the distillation LLM provider in config.yaml (if required by the agent).")
 
     args = parser.parse_args()
     main(args)

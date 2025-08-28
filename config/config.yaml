@@ -1,0 +1,132 @@
+# -------------------------
+# LLM Provider Configurations
+# -------------------------
+
+providers:
+  - name: "qwen3_14b_local_openai"
+    model_name: "Qwen/Qwen3-14B"
+    parsing_format: "think_tags"
+    provider_backend: openai
+    api_config:
+      base_url: "http://localhost:8000/v1"
+      api_key_env: "VLLM_API_KEY"
+    generation_config:
+      temperature: 0.3
+      max_tokens: 16384
+      two_pass: true
+      think_tag: think
+      max_thinking_tokens: 256
+      max_response_tokens: 2048
+
+  - name: "qwen3_14b_local_vllm_native"
+    model_name: "Qwen/Qwen3-14B"
+    parsing_format: "think_tags"
+    provider_backend: vllm_native
+    api_config:
+      base_url: "http://localhost:8001"
+      api_key_env: ""  # not used by vllm_native server
+    generation_config:
+      temperature: 0.3
+      max_tokens: 16384
+      two_pass: true
+      think_tag: think
+      max_thinking_tokens: 2048
+      max_response_tokens: 2048
+
+  - name: "qwen3_14b_local_vllm_native"
+    model_name: "Qwen/Qwen3-14B" 
+    parsing_format: "think_tags" 
+    provider_backend: openai
+    api_config:
+      base_url: "http://localhost:8000/v1"
+      api_key_env: "VLLM_API_KEY"
+    generation_config:
+      temperature: 0.3
+      max_tokens: 16384
+      two_pass: true
+      think_tag: think
+      max_thinking_tokens: 256
+      max_response_tokens: 2048
+
+  - name: "qwen3_14b_local"
+    provider_type: "openai"
+    model_name: "Qwen/Qwen3-14B" 
+    parsing_format: "think_tags" 
+    api_config:
+      base_url: "http://localhost:8000/v1"
+      api_key_env: "VLLM_API_KEY"
+    generation_config:
+      temperature: 0.3
+      max_tokens: 4096
+
+  - name: "kimi_k2_openrouter"
+    model_name: "moonshotai/kimi-k2"
+    parsing_format: "think_tags" 
+    provider_backend: openai
+    api_config:
+      base_url: "https://openrouter.ai/api/v1"
+      api_key_env: "OPENROUTER_API_KEY" 
+    generation_config:
+      temperature: 0.3
+      max_tokens: 4096
+      two_pass: true
+      think_tag: thinking
+      max_thinking_tokens: 256
+      max_response_tokens: 1024
+
+  - name: "gemini_2_5_pro_openrouter"
+    model_name: "google/gemini-2.5-pro"
+    parsing_format: "think_tags" 
+    api_config:
+      base_url: "https://openrouter.ai/api/v1"
+      api_key_env: "OPENROUTER_API_KEY" 
+    generation_config:
+      temperature: 0.3
+      max_tokens: 4096
+
+  - name: "gpt_4_1_mini_openrouter"
+    model_name: "openai/gpt-4.1-mini"
+    parsing_format: "think_tags" 
+    api_config:
+      base_url: "https://openrouter.ai/api/v1"
+      api_key_env: "OPENROUTER_API_KEY" 
+    generation_config:
+      temperature: 0.3
+      max_tokens: 4096
+
+  - name: "anthropic_haiku_3_5_openrouter"
+    model_name: "anthropic/claude-3.5-haiku"
+    parsing_format: "think_tags" 
+    api_config:
+      base_url: "https://openrouter.ai/api/v1"
+      api_key_env: "OPENROUTER_API_KEY" 
+    generation_config:
+      temperature: 0.3
+      max_tokens: 4096
+
+  - name: "qwen3_coder_openrouter"
+    model_name: "qwen/qwen3-coder"
+    parsing_format: "think_tags" 
+    api_config:
+      base_url: "https://openrouter.ai/api/v1"
+      api_key_env: "OPENROUTER_API_KEY" 
+    generation_config:
+      temperature: 0.3
+      max_tokens: 4096
+
+  # Added: vLLM native server with Hermes tool parser for Qwen3-14B
+  - name: "qwen3_14b_vllm_hermes"
+    model_name: "Qwen/Qwen3-14B"
+    parsing_format: "think_tags"
+    provider_backend: vllm_native
+    tool_parser: hermes
+    api_config:
+      base_url: "http://localhost:8001"
+      api_key_env: ""
+    generation_config:
+      temperature: 0.3
+      max_tokens: 16384
+      two_pass: true
+      think_tag: think
+      max_thinking_tokens: 500
+      max_response_tokens: 2048

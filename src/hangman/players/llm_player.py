@@ -98,8 +98,8 @@ if __name__ == "__main__":
 
     # --- Initialize LLM Provider ---
     try:
-        # Change 'qwen3_14b_local' to a provider name from your config.yaml
-        llm_provider = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local")
+        # Change 'qwen3_14b_local_vllm_native' to a provider name from your config.yaml
+        llm_provider = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local_vllm_native")
         print(f"✅ LLM Provider '{llm_provider.config['name']}' loaded successfully.")
     except Exception as e:
         print(f"❌ Failed to load LLM Provider: {e}")
