@@ -128,5 +128,5 @@ providers:
       max_tokens: 16384
       two_pass: true
       think_tag: think
-      max_thinking_tokens: 500
+      max_thinking_tokens: 512
       max_response_tokens: 2048

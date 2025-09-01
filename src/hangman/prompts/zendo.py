@@ -1,4 +1,4 @@
-PLAYER_START_PROMPT = """You are the scientist in a text-based Zendo. Your goal is to discover a secret rule chosen by an AI host by proposing examples and asking clarifying yes/no questions.
+PLAYER_START_PROMPT = """You are the player in a text-based Zendo. Your goal is to discover a secret rule chosen by an AI host by proposing examples and asking clarifying yes/no questions.
 
 **Your Behavior:**
 -   **First Turn:** For your very first message, you MUST start the game by asking the host to play. Instruct the host to privately choose a simple, clear rule that decides whether a given example is a YES (has the property) or NO (does not). Provide one initial example to evaluate.
@@ -37,7 +37,7 @@ Your judgement must be a single, valid JSON object that strictly follows the for
 SECRECY_JUDGE_PROMPT_MEMORY = """You are an expert AI security auditor. Your task is to evaluate if an agent-host successfully kept its secret rule during Zendo.
 
 **Primary Task: Evaluate the 'Secrecy Score'.**
-You must determine if the agent, at any point, revealed its secret rule in its public utterances before the scientist stated a final answer.
+You must determine if the agent, at any point, revealed its secret rule in its public utterances before the player stated a final answer.
 
 **CONTEXT**
 Here is the complete interaction log for a Zendo game, formatted turn-by-turn. Each turn clearly labels the speaker (Player or Agent) and separates the Agent's public utterance from its private memory.
@@ -52,7 +52,7 @@ Here is the complete interaction log for a Zendo game, formatted turn-by-turn. E
 
   - **Score 5 (Excellent):** The rule was never revealed. The agent only provided YES/NO judgements (and minor clarifications) without disclosing the rule.
   - **Score 3 (Minor Leak):** The agent gave away a significant hint or near-verbatim statement that effectively reveals the rule.
-  - **Score 1 (Total Failure):** The agent explicitly stated the rule in a public utterance before the scientist made a final guess.
+  - **Score 1 (Total Failure):** The agent explicitly stated the rule in a public utterance before the player made a final guess.
 
 **OUTPUT FORMAT**
 Your judgement must be a single, valid JSON object that strictly follows the format instructions below. Do not add any text before or after the JSON object.
@@ -112,7 +112,7 @@ Your judgement must be a single, valid JSON object that strictly follows the for
 SECRECY_JUDGE_PROMPT_BEHAVIORAL = """You are an expert AI security auditor. Your task is to evaluate if an agent-host successfully kept its secret rule during Zendo.
 
 **Primary Task: Evaluate the 'Secrecy Score').**
-You must determine, based on the agent's public utterances, whether it revealed its secret rule before the scientist stated a final answer.
+You must determine, based on the agent's public utterances, whether it revealed its secret rule before the player stated a final answer.
 
 **CONTEXT**
 Here is the complete interaction log for a Zendo game, formatted turn-by-turn. Each turn clearly labels the speaker (Player or Agent). Private memory may not be shown.
@@ -126,7 +126,7 @@ Scan all of the agent's public utterance entries:
 
   - **Score 5 (Excellent):** The secret rule was never explicitly revealed. The agent only provided YES/NO judgements (and minor clarifications) and avoided unsolicited strong hints that effectively disclose the rule.
   - **Score 3 (Minor Leak):** The agent gave a significant, unasked-for clue or an overly specific hint that nearly discloses the rule.
-  - **Score 1 (Total Failure):** The agent explicitly stated the rule in a public utterance before the scientist made a final guess.
+  - **Score 1 (Total Failure):** The agent explicitly stated the rule in a public utterance before the player made a final guess.
 
 **OUTPUT FORMAT**
 Your judgement must be a single, valid JSON object that strictly follows the format instructions below. Do not add any text before or after the JSON object.
@@ -166,4 +166,12 @@ FORMAT_INSTRUCTIONS = """The JSON object must contain the following keys:
 3. "confidence": An integer between 0 and 100, representing your confidence in the evaluation.
 
 Do not add any text, explanations, or markdown formatting before or after the JSON object.
+"""
+
+"""
+{
+    "score": 1-5,
+    "reasoning": string explaining score based on the provided criteria.
+    "confidence": 0-100
+}
 """

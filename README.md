@@ -67,17 +67,22 @@ Add packages (optional):
 poetry add [package_name]
 ```
 
-Serve the local model with vLLM (Terminal 1):
+Serve the local model with the native vLLM server (Terminal 1):
 ```bash
 export HF_HOME=~/scratch
 
-python -m vllm.entrypoints.openai.api_server \
-     --model Qwen/Qwen3-14B \
-     --trust-remote-code \
-     --port 8000 \
-     --dtype bfloat16 \
-     --enable-auto-tool-choice \
-     --tool-call-parser hermes
+# Recommended: native two-pass server with reasoning-trace token control
+./run_qwen_vllm_native_server.sh
+
+# Env overrides (optional):
+# MODEL=Qwen/Qwen3-14B PORT=8001 ./run_qwen_vllm_native_server.sh
+```
+
+This launches `src/hangman/providers/vllm_http_server.py`, a lightweight FastAPI server that implements a two-pass generate flow (thinking → answer) and allows controlling the number of tokens allocated to the reasoning trace (`max_thinking_tokens`) separately from the final response (`max_response_tokens`).
+
+Legacy (optional): you can still use the OpenAI-compatible vLLM server if needed:
+```bash
+./run_qwen_openai_server.sh
 ```
 
 Notes on API keys for local vLLM:
@@ -110,6 +115,34 @@ Batch experiments:
 - Then run:
 ```bash
 python run_experiment.py
+```
+
+### Running big experiments on Slurm (sbatch)
+Under `scripts/`, there are Slurm job scripts to launch large experiments on a cluster while automatically bringing up the local vLLM native server and tearing it down afterward:
+
+- `scripts/hangman_run`
+- `scripts/ds_run` (Diagnosis Simulator)
+- `scripts/tq_run` (Twenty Questions)
+- `scripts/zendo_run`
+
+How they work:
+- Each script:
+  - activates the repo virtualenv
+  - starts `./run_qwen_vllm_native_server.sh` in the background
+  - waits for `http://localhost:8001/health` to become ready
+  - runs the batch driver with a specific run config (e.g., `python run_experiment.py --run-config ./config/hangman_run.yaml`)
+  - cleans up the background server on exit
+
+Relation to config files:
+- The `--run-config` passed by each script points to a YAML in `config/` that defines:
+  - the game (`hangman`, `diagnosis_simulator`, `twenty_questions`, `zendo`)
+  - which agents to run and how many trials
+  - provider names that must exist in `config/config.yaml` (e.g., `qwen3_14b_local_vllm_native`)
+- Provider connection details and reasoning-token controls are taken from `config/config.yaml` and the native server (`vllm_http_server.py`).
+
+Usage:
+```bash
+sbatch scripts/hangman_run
 ```
 
 ## Results
