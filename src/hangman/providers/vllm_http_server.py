@@ -275,8 +275,11 @@ def main():
     global LLM_ENGINE, TOKENIZER, SRV_CFG
     SRV_CFG = ServerConfig(model=args.model, trust_remote_code=args.trust_remote_code, dtype=args.dtype)
 
-    logging.info("Loading vLLM model '%s' ...", args.model)
-    LLM_ENGINE = LLM(model=args.model, trust_remote_code=args.trust_remote_code)
+    logging.info("Loading vLLM model '%s' (dtype=%s) ...", args.model, args.dtype or "auto")
+    if args.dtype:
+        LLM_ENGINE = LLM(model=args.model, trust_remote_code=args.trust_remote_code, dtype=args.dtype)
+    else:
+        LLM_ENGINE = LLM(model=args.model, trust_remote_code=args.trust_remote_code)
     TOKENIZER = LLM_ENGINE.get_tokenizer()
     logging.info("Model loaded.")
 

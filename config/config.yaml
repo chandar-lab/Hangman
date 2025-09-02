@@ -130,3 +130,19 @@ providers:
       think_tag: think
       max_thinking_tokens: 512
       max_response_tokens: 2048
+
+  - name: "deepseek_r1_8b_vllm_native"
+    model_name: "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+    parsing_format: "think_tags"
+    provider_backend: vllm_native
+    tool_parser: hermes
+    api_config:
+      base_url: "http://localhost:8001"
+      api_key_env: ""
+    generation_config:
+      temperature: 0.3
+      max_tokens: 8192
+      two_pass: true
+      think_tag: think
+      max_thinking_tokens: 512
+      max_response_tokens: 1536
