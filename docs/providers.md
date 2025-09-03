@@ -238,3 +238,23 @@ Extend the native server to accept tool-calling parameters and Hermes parsing:
 - We avoid emulating the entire OpenAI Chat Completions spec in our native server; we expose a minimal, well-documented contract tailored to LangChain agents.
 
 
+
+## OpenRouter GPT-OSS (Harmony) support
+
+The `openai/gpt-oss-*` models use the Harmony format internally. When accessed through OpenRouter's OpenAI-compatible API, the provider handles Harmony rendering and tool-calling translation for you. Use the standard OpenAI backend in this framework:
+
+- Add a provider to `config/config.yaml`:
+  - `name`: e.g., `gpt_oss_20b_openrouter`
+  - `model_name`: `openai/gpt-oss-20b`
+  - `provider_backend`: `openai`
+  - `tool_parser`: `openai`
+  - `parsing_format`: `direct_response` (no `<think>` tags)
+  - `api_config.base_url`: `https://openrouter.ai/api/v1`
+  - `api_config.api_key_env`: `OPENROUTER_API_KEY` (ensure set in `.env`)
+
+- Behavior notes:
+  - Two-pass thinking is not used on this path; responses are single-pass via `ChatOpenAI`.
+  - Chain-of-thought appears in Harmony `analysis` channel and is not surfaced in the final content; `LLMProvider.parse_response` should be `direct_response`.
+  - Function/tool calling works via native OpenAI tool binding (`client.bind_tools(...)`). OpenRouter translates to Harmony under the hood and returns tool calls in the OpenAI-compatible schema.
+
+- Example usage in an agent/run config: set the agent's provider name to `gpt_oss_20b_openrouter`.

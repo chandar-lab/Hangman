@@ -401,20 +401,20 @@ class WorkflowAgent(BaseAgent):
 # --- Runnable CLI for Direct Testing ---
 if __name__ == "__main__":
 
-    CONFIG_PATH = "config.yaml"
+    CONFIG_PATH = "config/config.yaml"
     with open(CONFIG_PATH, 'r') as f:
         config = yaml.safe_load(f)
 
     try:
-        main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_vllm_hermes")
-        update_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_vllm_hermes")
+        main_llm = load_llm_provider(CONFIG_PATH, provider_name="deepseek_r1_8b_vllm_hermes")
+        update_llm = load_llm_provider(CONFIG_PATH, provider_name="deepseek_r1_8b_vllm_hermes")
         print("✅ LLM Providers loaded successfully.")
     except Exception as e:
         print(f"❌ Failed to load LLM Providers: {e}")
         exit()
 
     # Change strategy here: "overwrite", "patch_and_replace", or "append_and_delete"
-    agent = WorkflowAgent(responder_llm_provider=main_llm, updater_llm_provider=update_llm, strategy="append_and_delete")
+    agent = WorkflowAgent(responder_llm_provider=main_llm, updater_llm_provider=update_llm, strategy="overwrite")
     print(f"🤖 WorkflowAgent ({agent.strategy}) is ready. Type 'quit', 'exit', or 'q' to end.")
 
     messages = []

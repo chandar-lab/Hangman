@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, Optional, Union
 
-from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 
 
 ToolChoice = Union[Literal["auto", "none"], Dict[str, str]]
@@ -86,18 +86,73 @@ class BaseClient(ABC):
     # Shared helper utilities
     # --------------------------
     @staticmethod
-    def to_openai_chat(messages: List[BaseMessage]) -> List[Dict[str, str]]:
+    def to_openai_chat(messages: List[BaseMessage]) -> List[Dict[str, Any]]:
         """
-        Convert LangChain messages to OpenAI-style chat dicts: {role, content}.
+        Convert LangChain messages to OpenAI-style chat dicts, preserving:
+        - assistant.tool_calls (OpenAI function calls)
+        - tool messages with tool_call_id
         """
-        out: List[Dict[str, str]] = []
+        out: List[Dict[str, Any]] = []
         for m in messages:
             role = getattr(m, "type", None) or "user"
             if role == "human":
                 role = "user"
             elif role == "ai":
                 role = "assistant"
+
+            # --- ToolMessage (role="tool"): must include tool_call_id (+ optional name) ---
+            if isinstance(m, ToolMessage):
+                msg: Dict[str, Any] = {
+                    "role": "tool",
+                    "content": str(m.content) if m.content is not None else "",
+                    "tool_call_id": getattr(m, "tool_call_id", None),
+                }
+                # Some providers accept/expect name as well
+                name = getattr(m, "name", None)
+                if name:
+                    msg["name"] = str(name)
+                if not msg["tool_call_id"]:
+                    # Defensive: better to fail early than send malformed payload
+                    raise ValueError("ToolMessage missing required tool_call_id.")
+                out.append(msg)
+                continue
+
+            # --- AIMessage with tool_calls (assistant side) ---
+            if isinstance(m, AIMessage):
+                tool_calls_payload: List[Dict[str, Any]] = []
+                lc_calls = getattr(m, "tool_calls", None) or []
+                for idx, call in enumerate(lc_calls):
+                    # Expect structure: {"id": str, "name": str, "args": dict}
+                    call_id = call.get("id") or f"call_{idx+1}"
+                    name = call.get("name")
+                    args = call.get("args", {}) or {}
+                    # OpenAI expects stringified JSON for function.args
+                    try:
+                        args_json = json.dumps(args, ensure_ascii=False)
+                    except Exception:
+                        args_json = "{}"
+                    tool_calls_payload.append({
+                        "id": call_id,
+                        "type": "function",
+                        "function": {
+                            "name": str(name),
+                            "arguments": args_json,
+                        },
+                    })
+
+                msg: Dict[str, Any] = {
+                    "role": role,  # "assistant"
+                    "content": str(m.content) if m.content is not None else "",
+                }
+                if tool_calls_payload:
+                    msg["tool_calls"] = tool_calls_payload
+
+                out.append(msg)
+                continue
+
+            # --- Fallback: system/user/developer/etc. ---
             out.append({"role": role, "content": str(m.content)})
+
         return out
 
     @staticmethod

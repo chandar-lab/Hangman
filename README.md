@@ -4,18 +4,44 @@ Conversational agents with private working memory and a reasoning distillation l
 ![Alt text](assets/Main_Figure_Hangman.png "Optional Title")
 
 ## What this repo does
-- Benchmarks agents that keep a private state (“working memory”) and refine it each turn via think → distill → patch.
-- Runs single games and batch experiments, logs full interactions (public utterances + private memory), and scores with an LLM Judge.
+- Builds and evaluates conversational agents with private working memory that persists across turns.
+- Supports two agent paradigms: WorkflowAgent (two-LLM responder → updater) and ReActMemAgent (single-LLM ReAct with tools), plus CoT/stateless variants.
+- Updates memory using three strategies via structured tools: overwrite; patch_and_replace; append_and_delete.
+- Runs single games or batch experiments (Hangman, Twenty Questions, Zendo, Diagnosis Simulator), logs full interactions, and evaluates with an LLM Judge (behavioral and memory views, plus winner).
+- Plugs into multiple model backends through `LLMProvider`: `vllm_native`, `openrouter_sdk`, and OpenAI-compatible servers.
 
-## How it works (flow in one page)
+### Supported agents
+- `WorkflowAgent` (two-LLM, two-stage: responder → updater)
+- `ReActMemAgent` (single-LLM ReAct with memory-edit tools)
+- `PublicCoTAgent` (publishes chain-of-thought)
+- `PrivateCoTAgent` (stores chain-of-thought privately)
+- `ReActAgent` (stateless ReAct)
+- `VanillaLLMAgent` (plain chat)
+
+### Memory update strategies (tools)
+All memoryful agents can use one of three strategies for updating private `working_memory`:
+- overwrite: `overwrite_memory`
+- patch_and_replace: `patch_memory` and/or `replace_in_memory`
+- append_and_delete: `append_in_memory` and/or `delete_from_memory`
+
+## How it works 
 1) Providers
-    - `config.yaml` declares LLM endpoints (local vLLM or OpenRouter), model names, parsing format (think tags vs direct), and gen params.
-    - `LLMProvider` wraps an OpenAI-compatible client and parses optional <think>…</think> text.
+    - `config/config.yaml` declares LLM endpoints, model names, parsing format (think tags vs direct), and generation params.
+    - Backends supported by `LLMProvider`:
+        - `vllm_native`: custom FastAPI server (`src/hangman/providers/vllm_http_server.py`) with two-pass generation and tool-call support.
+        - `openrouter_sdk`: OpenRouter via the OpenAI SDK; optional reasoning text is wrapped into `<think>` for uniform parsing.
+        - OpenAI-compatible HTTP clients (default fallback) for other compatible servers.
+    - `LLMProvider` parses optional `<think>…</think>` text (when `parsing_format: think_tags`) into `thinking` vs public `response`.
 
-2) Agent (example: ReaDisPatActAgent)
-    - LangGraph workflow: generate_response → generate_diff → apply_diff.
-    - Response uses `working_memory` as context; distillation LLM emits a text patch; diff-match-patch updates `working_memory`.
-    - A persistent “main_thread” stores messages + memory across turns.
+2) Agents (ReAct vs Workflow)
+    - WorkflowAgent (two-stage):
+        - Responder LLM produces the public reply (optionally with `<think>` reasoning).
+        - Updater LLM returns STRICT-JSON tool calls which are executed to update private `working_memory`.
+        - Persists conversation and memory via LangGraph checkpoints.
+    - ReActMemAgent (single-LLM ReAct with tools):
+        - Model may emit tool calls inline; the agent executes memory tools sequentially and persists updated `working_memory`.
+        - History is pruned per turn to drop within-turn tool chatter while keeping the final AI message.
+    - Other variants: `PublicCoTAgent` (thinking appended publicly), `PrivateCoTAgent` (thinking stored privately), `ReActAgent` (stateless), `VanillaLLMAgent`.
 
 3) Player
     - `LLMPlayer` role-plays using a system prompt and a role-reversed copy of the public conversation.
@@ -28,8 +54,8 @@ Conversational agents with private working memory and a reasoning distillation l
     - `LLMJudge` selects prompts via `evaluation/prompt_registry.py` for “memory” vs “behavioral” modes and extracts a JSON with scores for metrics (intentionality, secrecy, mechanism, coherence).
 
 ## Architecture (modules)
-- providers: `LLMProvider`, `load_llm_provider` (OpenAI-compatible client + think-tag parsing)
-- agents: `BaseAgent` + variants (notably `ReaDisPatActAgent` with LangGraph)
+- providers: `LLMProvider`, `load_llm_provider` (native vLLM / OpenRouter / OpenAI-compatible)
+- agents: `BaseAgent` + variants (`WorkflowAgent`, `ReActMemAgent`, `PublicCoTAgent`, `PrivateCoTAgent`, `ReActAgent`, `VanillaLLMAgent`)
 - players: `LLMPlayer` (role-player)
 - games: “Game as a log” (`BaseGame`, `HangmanGame` for prompts)
 - engine: `GameLoopController` (turn loop, JSON logs, judge)
@@ -38,7 +64,7 @@ Conversational agents with private working memory and a reasoning distillation l
 
 ## Data flow (inputs → engine → outputs)
 - Inputs: `games_run.yaml` (game, agents, trials, max_turns, eval modes/metrics, provider names) + `config.yaml` (provider specs).
-- Runtime: Engine passes LangChain messages between Player (as user) and Agent (as assistant). Agent maintains private `working_memory` via diff/patch.
+- Runtime: Engine passes LangChain messages between Player (as user) and Agent (as assistant). Agent maintains private `working_memory` via structured memory tools (overwrite, patch/replace, append/delete).
 - Outputs: One JSON per trial under `results/<game>/<agent>/…` with metadata, `interaction_log` (list of [utterance, private_state]), and `evaluation`.
 
 ---
@@ -93,11 +119,11 @@ Notes on API keys for local vLLM:
 ## Run
 Quick chat loops (Terminal 2, venv activated):
 ```Bash
-python src/hangman/agents/readispatactagent.py
+python src/hangman/agents/workflow_agent.py
 ```
 or
 ```bash
-python src/hangman/agents/react.py
+python src/hangman/agents/reactmem_agent.py
 ```
 
 Agent vs Player (engine-driven game loop):
@@ -114,7 +140,7 @@ Batch experiments:
 - Edit `games_run.yaml` (agents, trials, max_turns, providers, eval modes)
 - Then run:
 ```bash
-python run_experiment.py
+python run_experiment.py --run-config ./config/games_run.yaml --providers-config ./config/config.yaml
 ```
 
 ### Running big experiments on Slurm (sbatch)
@@ -137,7 +163,7 @@ Relation to config files:
 - The `--run-config` passed by each script points to a YAML in `config/` that defines:
   - the game (`hangman`, `diagnosis_simulator`, `twenty_questions`, `zendo`)
   - which agents to run and how many trials
-  - provider names that must exist in `config/config.yaml` (e.g., `qwen3_14b_local_vllm_native`)
+  - provider names that must exist in `config/config.yaml` (e.g., `qwen3_14b_vllm_hermes`)
 - Provider connection details and reasoning-token controls are taken from `config/config.yaml` and the native server (`vllm_http_server.py`).
 
 Usage:

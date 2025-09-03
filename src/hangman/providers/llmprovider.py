@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from langchain_core.messages import BaseMessage
 from langchain_openai import ChatOpenAI
 from .vllm_client import ChatVllm
+from .openrouter_client import ChatOpenRouter
 
 # --- Setup ---
 load_dotenv()
@@ -22,10 +23,33 @@ class APIConfig(TypedDict):
     base_url: str
     api_key_env: str
 
+# class GenerationConfig(TypedDict):
+#     temperature: float
+#     max_tokens: int
+#     # Optional two-pass controls for vLLM native backend
+#     two_pass: Optional[bool]
+#     think_tag: Optional[Literal["think", "thinking"]]
+#     max_thinking_tokens: Optional[int]
+#     max_response_tokens: Optional[int]
+
+# class ProviderConfig(TypedDict):
+#     name: str
+#     model_name: str
+#     # NEW: This key determines how to parse the model's output.
+#     parsing_format: Optional[Literal["think_tags", "direct_response"]]
+#     # Backend selection: "openai" (ChatOpenAI over HTTP) or "vllm_native" (custom HTTP server)
+#     provider_backend: Optional[Literal["openai", "vllm_native"]]
+#     # How tools are formatted/parsed (primarily relevant for vLLM native or servers with Hermes)
+#     tool_parser: Optional[Literal["openai", "hermes"]]
+#     api_config: APIConfig
+#     generation_config: GenerationConfig
+
 class GenerationConfig(TypedDict):
     temperature: float
     max_tokens: int
-    # Optional two-pass controls for vLLM native backend
+    include_reasoning: Optional[bool]          
+    reasoning_effort: Optional[str]            
+    # existing:
     two_pass: Optional[bool]
     think_tag: Optional[Literal["think", "thinking"]]
     max_thinking_tokens: Optional[int]
@@ -34,12 +58,9 @@ class GenerationConfig(TypedDict):
 class ProviderConfig(TypedDict):
     name: str
     model_name: str
-    # NEW: This key determines how to parse the model's output.
-    parsing_format: Optional[Literal["think_tags", "direct_response"]]
-    # Backend selection: "openai" (ChatOpenAI over HTTP) or "vllm_native" (custom HTTP server)
-    provider_backend: Optional[Literal["openai", "vllm_native"]]
-    # How tools are formatted/parsed (primarily relevant for vLLM native or servers with Hermes)
-    tool_parser: Optional[Literal["openai", "hermes"]]
+    parsing_format: Optional[Literal["think_tags","direct_response","message_reasoning"]]  
+    provider_backend: Optional[Literal["openai","vllm_native","openrouter_sdk"]]           
+    tool_parser: Optional[Literal["openai","hermes"]]
     api_config: APIConfig
     generation_config: GenerationConfig
 
@@ -56,6 +77,7 @@ class LLMProvider:
     def _create_client(self) -> Any:
         backend = self.config.get("provider_backend", "openai")
         api_key_env = self.config["api_config"].get("api_key_env")
+        api_key = os.environ.get(api_key_env) if api_key_env else None
         base_url = self.config["api_config"].get("base_url")
 
         gen_cfg = self.config.get("generation_config", {})
@@ -76,8 +98,21 @@ class LLMProvider:
                 max_response_tokens=int(gen_cfg.get("max_response_tokens", 1024)),
             )
 
-        # Default: OpenAI-compatible HTTP client (vLLM OpenAI server, OpenRouter, etc.)
-        api_key = os.environ.get(api_key_env) if api_key_env else None
+        if backend == "openrouter_sdk":
+            include_reasoning = bool(gen_cfg.get("include_reasoning", True))
+            reasoning_effort = gen_cfg.get("reasoning_effort")  # 'low'|'medium'|'high'|'auto'|None
+            think_tag = gen_cfg.get("think_tag", "think")
+
+            return ChatOpenRouter(
+                model_name=self.config["model_name"],
+                base_url=base_url,
+                api_key=api_key or "",
+                temperature=temperature,
+                max_tokens=max_tokens,
+                include_reasoning=include_reasoning,
+                reasoning_effort=reasoning_effort,
+                think_tag=think_tag,
+            )
 
         # Allow missing API key for localhost endpoints (common for local vLLM servers)
         if api_key_env and api_key is None:

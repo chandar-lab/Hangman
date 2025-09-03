@@ -176,7 +176,6 @@ class ReActMemAgent(BaseAgent):
                         tool_call_id=tool_call["id"],
                     )
                     out_msgs.append(tool_message)
-                    working_mem = state.get("working_memory", "")
                     continue
 
                 tool_message = ToolMessage(
@@ -188,7 +187,7 @@ class ReActMemAgent(BaseAgent):
                 working_mem = new_memory
 
             if tool.name == "delete_from_memory":
-                tool_args["current_memory"] = state.get("working_memory", "")
+                tool_args["current_memory"] = working_mem
 
                 try:
                     new_memory = tool.invoke(tool_args)
@@ -199,7 +198,6 @@ class ReActMemAgent(BaseAgent):
                         tool_call_id=tool_call["id"],
                     )
                     out_msgs.append(tool_message)
-                    working_mem = state.get("working_memory", "")
                     continue
 
                 tool_message = ToolMessage(
@@ -211,7 +209,7 @@ class ReActMemAgent(BaseAgent):
                 working_mem = new_memory
 
             if tool.name == "append_in_memory":
-                tool_args["current_memory"] = state.get("working_memory", "")
+                tool_args["current_memory"] = working_mem
 
                 try:
                     new_memory = tool.invoke(tool_args)
@@ -222,7 +220,6 @@ class ReActMemAgent(BaseAgent):
                         tool_call_id=tool_call["id"],
                     )
                     out_msgs.append(tool_message)
-                    working_mem = state.get("working_memory", "")
                     continue
 
                 tool_message = ToolMessage(
@@ -234,7 +231,7 @@ class ReActMemAgent(BaseAgent):
                 working_mem = new_memory
 
             if tool.name in ("patch_memory", "replace_in_memory"):
-                tool_args["current_memory"] = state.get("working_memory", "")
+                tool_args["current_memory"] = working_mem
 
                 try:
                     result = tool.invoke(tool_args)
@@ -245,7 +242,6 @@ class ReActMemAgent(BaseAgent):
                         tool_call_id=tool_call["id"],
                     )
                     out_msgs.append(tool_message)
-                    working_mem = state.get("working_memory", "")
                     continue
 
                 if isinstance(result, dict) and "new_memory" in result:
@@ -259,7 +255,6 @@ class ReActMemAgent(BaseAgent):
                         tool_call_id=tool_call["id"],
                     )
                     out_msgs.append(tool_message)
-                    working_mem = state.get("working_memory", "")
                     continue
 
                 tool_message = ToolMessage(
@@ -416,12 +411,13 @@ class ReActMemAgent(BaseAgent):
 
 # --- Runnable CLI for Direct Testing ---
 if __name__ == "__main__":
-    CONFIG_PATH = "config.yaml"
+    CONFIG_PATH = "config/config.yaml"
+    print("Is file readable: ", os.access(CONFIG_PATH, os.R_OK))
     with open(CONFIG_PATH, 'r') as f:
         config = yaml.safe_load(f)
 
     try:
-        main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_vllm_hermes")
+        main_llm = load_llm_provider(CONFIG_PATH, provider_name="gpt_oss_20b_openrouter")
         print("✅ LLM Provider loaded successfully.")
     except Exception as e:
         print(f"❌ Failed to load LLM Provider: {e}")
