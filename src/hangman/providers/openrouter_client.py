@@ -63,6 +63,10 @@ class ChatOpenRouter(BaseClient):
     def invoke(self, messages: List[BaseMessage]) -> AIMessage:
         wire_messages = self.to_openai_chat(messages)
 
+        print(f"--- From OpenRouter Client ---")
+        print(f"Wire messages: {wire_messages}")
+        print(f"--- End OpenRouter Client ---")
+
         # Reasoning knob (provider-specific); OpenRouter often works w/out it, but support both
         extra_body: Dict[str, Any] = {}
         if self.include_reasoning or self.reasoning_effort:
@@ -108,6 +112,14 @@ class ChatOpenRouter(BaseClient):
 
         final_text = msg.get("content") or ""
         reasoning_text = msg.get("reasoning") or ""  # OpenRouter returns a string when exposed
+
+        # print(f"--- From OpenRouter Client ---")
+        # print(f"Final text: {final_text}")
+        # print()
+        # print(f"Reasoning text: {reasoning_text}")
+        # print()
+        # print(f"Tool calls: {msg.get('tool_calls')}")
+        # print(f"--- End OpenRouter Client ---")
 
         # Make it compatible with your parse_response(...): embed <think>...</think> at the top.
         content = self._compose_content_with_think(final_text, reasoning_text)

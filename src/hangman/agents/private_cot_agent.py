@@ -20,13 +20,10 @@ class AgentState(TypedDict):
     """
     # The public conversation messages
     messages: List[BaseMessage]
-
     # A string containing all past reasoning traces, separated by a delimiter.
     working_memory: str
-
     # The public-facing response for the current turn
     response: str
-
     # The private thinking trace for the current turn
     thinking: str
 

@@ -18,6 +18,7 @@ from hangman.prompts.workflow_agent import (
     MAIN_SYSTEM_PROMPT,
     UPDATE_MEMORY_SYSTEM_PROMPT,
     INITIAL_WORKING_MEMORY,
+    SAVE_SECRET_HINT,
 )
 
 # --- Import memory tools (docstrings used in updater prompt) ---
@@ -131,6 +132,7 @@ class WorkflowAgent(BaseAgent):
         strategy: StrategyName,
         *,
         initial_memory: Optional[str] = None,
+        add_save_secret_hint: bool = True,
     ):
         super().__init__(llm_provider=responder_llm_provider)
         self.responder_llm = responder_llm_provider
@@ -142,6 +144,12 @@ class WorkflowAgent(BaseAgent):
 
         # Precompute the updater prompt tool documentation text using tool docstrings.
         self._tool_guide_text = self._build_tool_guide_text(strategy)
+
+        # Save system prompts as attributes
+        self.responder_system_prompt = MAIN_SYSTEM_PROMPT
+        self.update_memory_system_prompt = UPDATE_MEMORY_SYSTEM_PROMPT
+        if add_save_secret_hint:
+            self.update_memory_system_prompt += SAVE_SECRET_HINT
 
         # Build graph
         self.workflow = self._build_workflow()
@@ -168,7 +176,7 @@ class WorkflowAgent(BaseAgent):
     def _generate_response(self, state: AgentState) -> dict:
         """Responder LLM produces the public reply; no memory edits here."""
         print(f"---WORKFLOW AGENT: _generate_response---")
-        prompt = MAIN_SYSTEM_PROMPT.format(working_memory=state["working_memory"])
+        prompt = self.responder_system_prompt.format(working_memory=state["working_memory"])
 
         messages = [SystemMessage(content=prompt)] + state["messages"]
         result = self.responder_llm.invoke(messages, thinking=True)
@@ -342,7 +350,7 @@ class WorkflowAgent(BaseAgent):
 
         dialogue = "\n".join(fmt_msg(m) for m in messages)
 
-        return UPDATE_MEMORY_SYSTEM_PROMPT.format(
+        return self.update_memory_system_prompt.format(
             strategy=self.strategy,
             tool_guide=tool_guide_text,
             working_memory=working_memory,
@@ -406,8 +414,8 @@ if __name__ == "__main__":
         config = yaml.safe_load(f)
 
     try:
-        main_llm = load_llm_provider(CONFIG_PATH, provider_name="deepseek_r1_8b_vllm_hermes")
-        update_llm = load_llm_provider(CONFIG_PATH, provider_name="deepseek_r1_8b_vllm_hermes")
+        main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_vllm_hermes")
+        update_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_vllm_hermes")
         print("✅ LLM Providers loaded successfully.")
     except Exception as e:
         print(f"❌ Failed to load LLM Providers: {e}")

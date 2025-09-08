@@ -1,0 +1,27 @@
+game: hangman
+
+results_dir: results/test_multi/hangman/
+
+providers:
+  # Enable per-GPU parallelism by specifying provider pools
+  main_pool: [qwen3_14b_vllm_hermes_gpu0, qwen3_14b_vllm_hermes_gpu1, qwen3_14b_vllm_hermes_gpu2, qwen3_14b_vllm_hermes_gpu3]
+  player_pool: [qwen3_14b_vllm_hermes_gpu0, qwen3_14b_vllm_hermes_gpu1, qwen3_14b_vllm_hermes_gpu2, qwen3_14b_vllm_hermes_gpu3]
+  judge_pool: [qwen3_14b_vllm_hermes_gpu0, qwen3_14b_vllm_hermes_gpu1, qwen3_14b_vllm_hermes_gpu2, qwen3_14b_vllm_hermes_gpu3]
+  # Fallback single providers (unused when pools are present)
+  main: qwen3_14b_vllm_hermes_gpu0
+  player: qwen3_14b_vllm_hermes_gpu0
+  judge: qwen3_14b_vllm_hermes_gpu0
+
+agents:
+  - VanillaLLMAgent:
+      name: vanilla_llm_agent
+
+num_trials: 8
+max_turns: 2
+first_mover: player
+
+evaluator:
+  mode: both
+  judge_llm_provider: qwen3_14b_vllm_hermes_gpu0
+
+

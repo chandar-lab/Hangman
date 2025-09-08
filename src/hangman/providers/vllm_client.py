@@ -33,7 +33,7 @@ class ChatVllm(BaseClient):
         think_tag: str = "think",
         max_thinking_tokens: int = 256,
         max_response_tokens: int = 1024,
-        request_timeout_s: int = 120,
+        request_timeout_s: int = 300,
     ) -> None:
         super().__init__(
             model_name=model_name,
@@ -49,8 +49,22 @@ class ChatVllm(BaseClient):
         self.request_timeout_s = int(request_timeout_s)
 
     def _build_payload(self, messages: List[BaseMessage]) -> Dict[str, Any]:
+        # Build OpenAI-style messages, then strip assistant-side tool_calls which the
+        # native vLLM /generate endpoint does not accept in the messages array.
+        wire_messages = self.to_openai_chat(messages)
+        cleaned_messages: List[Dict[str, Any]] = []
+        for msg in wire_messages:
+            try:
+                if isinstance(msg, dict) and "tool_calls" in msg:
+                    msg = dict(msg)
+                    msg.pop("tool_calls", None)
+            except Exception:
+                # Best-effort cleaning; fall through with original msg
+                pass
+            cleaned_messages.append(msg)
+
         payload: Dict[str, Any] = {
-            "messages": self.to_openai_chat(messages),
+            "messages": cleaned_messages,
             "temperature": self.temperature,
             "two_pass": self.two_pass,
             "think_tag": self.think_tag,

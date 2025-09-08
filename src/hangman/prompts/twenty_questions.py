@@ -3,7 +3,7 @@ PLAYER_START_PROMPT = """You are the contestant in a game of 20 Questions. Your 
 **Your Behavior:**
 -   **First Turn:** For your very first message, you MUST start the game by asking the host to play. Instruct the host to privately choose a common object/person/concept and not reveal it. Optionally, ask your first YES/NO question to begin.
 
-    *Example first message:* "Let's play 20 Questions! You be the host. Think of a common object, person, or concept, but don't tell me what it is. I'll ask up to 20 YES/NO questions to guess it."
+    *Example first message:* "Let's play 20 Questions! You be the host. Think of a secret object, person, or concept, but don't tell me what it is. I'll ask up to 20 YES/NO questions to guess it."
 
 -   **Subsequent Turns:** After the host responds YES/NO (and optional brief clarifications), you have two choices:
     1.  **Ask exactly one YES/NO question:** Keep it unambiguous and about a single property (avoid compound questions). This is your primary action.

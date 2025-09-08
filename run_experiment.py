@@ -6,13 +6,15 @@ import inspect
 from datetime import datetime
 from tqdm import tqdm
 from typing import Dict, Any
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from itertools import cycle
 
 # --- Project-Specific Imports ---
 from hangman.providers.llmprovider import LLMProvider, load_llm_provider
 from hangman.games import create_game
 from hangman.players.llm_player import LLMPlayer
 from hangman.engine import GameLoopController
-from hangman.evaluation.judge import LLMJudge
+from hangman.evaluation.hybrid_evaluator import HybridEvaluator
 
 # Import agent factory and classes
 import hangman.agents as agents_pkg
@@ -68,6 +70,56 @@ def _instantiate_agent_from_spec(
     raise ValueError(f"Invalid agent specification: {agent_spec}")
 
 
+# --- Worker entry point for parallel trial execution ---
+def _run_trial_job(
+    *,
+    run_config: Dict[str, Any],
+    providers_config_path: str,
+    agent_spec: Any,
+    game_name: str,
+    max_turns: int,
+    agent_results_dir: str,
+    eval_mode: Any,
+    metrics: Any,
+    first_mover: str,
+    main_provider_name: str,
+    player_provider_name: str,
+    judge_provider_name: str,
+):
+    try:
+        # Load providers for this worker
+        main_llm = load_llm_provider(providers_config_path, main_provider_name)
+        player_llm = load_llm_provider(providers_config_path, player_provider_name)
+        judge_llm = load_llm_provider(providers_config_path, judge_provider_name)
+
+        # Instantiate components for this trial
+        agent = _instantiate_agent_from_spec(
+            agent_spec=agent_spec,
+            providers_config_path=providers_config_path,
+            default_main=main_llm,
+        )
+        player = LLMPlayer(llm_provider=player_llm)
+        game = create_game(game_name)[0]
+        evaluator = HybridEvaluator(
+            judge_llm_provider=judge_llm,
+            game=game_name,
+            mode=eval_mode if isinstance(eval_mode, str) else "both",
+        )
+
+        controller = GameLoopController(
+            agent=agent,
+            player=player,
+            game=game,
+            evaluator=evaluator,
+            max_turns=max_turns,
+            results_dir=agent_results_dir,
+        )
+        controller.run(first_mover=first_mover, eval_mode=eval_mode, metrics=metrics)
+        return True
+    except Exception:
+        return False
+
+
 # --- Main Experiment Runner ---
 
 def run_experiments(
@@ -96,30 +148,37 @@ def run_experiments(
     max_turns = int(run_cfg.get("max_turns", 20))
     base_results_dir = run_cfg.get("results_dir", f"results/{game_name}")
 
-    # Evaluation configuration for LLMJudge
-    judge_cfg = run_cfg.get("judge", {}) or {}
-    eval_mode = judge_cfg.get("mode", "both")  # "memory" | "behavioral" | "both"
-    judge_provider_name = judge_cfg.get("judge_llm_provider", None)
+    # Evaluation configuration for evaluator (behavioral | memory | rule_based | both | all)
+    evaluator_cfg = run_cfg.get("evaluator", {}) or {}
+    eval_mode = evaluator_cfg.get("mode", "both")  # "memory" | "behavioral" | "both" | "rule_based" | "all"
+    judge_provider_name = evaluator_cfg.get("judge_llm_provider", None)
     metrics = run_cfg.get("metrics")  # Optional: ["intentionality", "secrecy", "mechanism", "coherence"]
     first_mover = run_cfg.get("first_mover", "player")
 
-    # Provider defaults (for legacy/simple agent specs)
+    # Provider defaults and optional provider pools (for parallel per-GPU runs)
     providers = run_cfg.get("providers", {})
     MAIN_LLM_NAME = providers.get("main", "qwen3_14b_local_vllm_native")
     PLAYER_LLM_NAME = providers.get("player", MAIN_LLM_NAME)
     DEFAULT_JUDGE_LLM_NAME = providers.get("judge", MAIN_LLM_NAME)
 
-    # 1. Load default/shared LLM Providers once
+    # Optional provider pools; if specified, they enable multi-process execution
+    MAIN_POOL = providers.get("main_pool") or []
+    PLAYER_POOL = providers.get("player_pool") or []
+    JUDGE_POOL = providers.get("judge_pool") or []
+    # When pools are absent, fall back to single providers
+
+    # 1. Load default/shared LLM Providers once (only if not using pools)
     print("--- 🧪 Initializing Experiment ---")
-    try:
-        main_llm_default = load_llm_provider(PROVIDERS_CONFIG_PATH, MAIN_LLM_NAME)
-        player_llm = load_llm_provider(PROVIDERS_CONFIG_PATH, PLAYER_LLM_NAME)
-        judge_llm_name = judge_provider_name or DEFAULT_JUDGE_LLM_NAME
-        judge_llm = load_llm_provider(PROVIDERS_CONFIG_PATH, judge_llm_name)
-        print("✅ All LLM Providers initialized successfully.")
-    except Exception as e:
-        print(f"❌ Failed to initialize LLM Providers: {e}. Exiting.")
-        sys.exit(1)
+    if not MAIN_POOL:
+        try:
+            main_llm_default = load_llm_provider(PROVIDERS_CONFIG_PATH, MAIN_LLM_NAME)
+            player_llm = load_llm_provider(PROVIDERS_CONFIG_PATH, PLAYER_LLM_NAME)
+            judge_llm_name = judge_provider_name or DEFAULT_JUDGE_LLM_NAME
+            judge_llm = load_llm_provider(PROVIDERS_CONFIG_PATH, judge_llm_name)
+            print("✅ All LLM Providers initialized successfully.")
+        except Exception as e:
+            print(f"❌ Failed to initialize LLM Providers: {e}. Exiting.")
+            sys.exit(1)
 
     # 1.b Create selected game
     try:
@@ -149,9 +208,46 @@ def run_experiments(
         agent_results_dir = os.path.join(base_results_dir, agent_name)
         os.makedirs(agent_results_dir, exist_ok=True)
 
+        # --- CLEANUP/RESUME: remove incomplete logs without evaluation ---
+        def _is_complete_log(filepath: str) -> bool:
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f)
+                # Consider complete if it has an evaluation block with results
+                return isinstance(data, dict) and isinstance(data.get("evaluation", {}).get("results"), dict)
+            except Exception:
+                return False
+
+        try:
+            for fname in os.listdir(agent_results_dir):
+                if not fname.endswith('.json'):
+                    continue
+                fpath = os.path.join(agent_results_dir, fname)
+                if not _is_complete_log(fpath):
+                    try:
+                        os.remove(fpath)
+                    except Exception:
+                        # Best-effort cleanup; ignore deletion failures
+                        pass
+        except FileNotFoundError:
+            pass
+
         # --- RESUMABILITY LOGIC ---
         try:
-            completed_trials = len([f for f in os.listdir(agent_results_dir) if f.endswith('.json')])
+            completed_trials = 0
+            for f in os.listdir(agent_results_dir):
+                if not f.endswith('.json'):
+                    continue
+                fpath = os.path.join(agent_results_dir, f)
+                # Count only complete logs
+                try:
+                    with open(fpath, "r", encoding="utf-8") as fp:
+                        data = yaml.safe_load(fp)
+                    if isinstance(data, dict) and isinstance(data.get("evaluation", {}).get("results"), dict):
+                        completed_trials += 1
+                except Exception:
+                    # Skip unreadable files
+                    continue
         except FileNotFoundError:
             completed_trials = 0
 
@@ -161,47 +257,78 @@ def run_experiments(
 
         print(f"▶️  Found {completed_trials} existing trials. Starting from trial {completed_trials + 1}.")
 
-        # Use tqdm for a progress bar over the trials
         needed_trials = num_trials - completed_trials
-        for i in tqdm(range(needed_trials), desc=f"Agent: {agent_name}", unit="trial"):
-            try:
-                # 3. Instantiate fresh components for each trial
-                agent = _instantiate_agent_from_spec(
-                    agent_spec=agent_spec,
-                    providers_config_path=PROVIDERS_CONFIG_PATH,
-                    default_main=main_llm_default,
-                )
-                player = LLMPlayer(llm_provider=player_llm)
-                # create a fresh game each trial to reset any internal prints
-                game = create_game(normalized_game)[0]
 
-                # Initialize LLMJudge for this game (prompts are selected per-call).
-                llm_judge = LLMJudge(
-                    judge_llm_provider=judge_llm,
-                    game=normalized_game,
-                    mode=eval_mode if isinstance(eval_mode, str) else "both",
-                )
+        # If MAIN_POOL is configured, run trials in parallel across providers
+        if MAIN_POOL:
+            judge_pool = JUDGE_POOL if JUDGE_POOL else [judge_provider_name or DEFAULT_JUDGE_LLM_NAME]
+            player_pool = PLAYER_POOL if PLAYER_POOL else [PLAYER_LLM_NAME]
 
-                # 4. Initialize and run the Game Loop Controller
-                controller = GameLoopController(
-                    agent=agent,
-                    player=player,
-                    game=game,
-                    llm_judge=llm_judge,
-                    max_turns=max_turns,
-                    results_dir=agent_results_dir
-                )
-                controller.run(first_mover=first_mover, eval_mode=eval_mode, metrics=metrics)
+            main_cycle = cycle(MAIN_POOL)
+            player_cycle = cycle(player_pool)
+            judge_cycle = cycle(judge_pool)
 
-            except Exception as e:
-                print(f"\n--- ❌ ERROR on trial {i+1} for {agent_name}: {e} ---")
-                # Log the error and continue to the next trial
-                error_log_path = os.path.join(agent_results_dir, "error_log.txt")
-                with open(error_log_path, "a") as f:
-                    f.write(f"Timestamp: {datetime.now().isoformat()}\n")
-                    f.write(f"Trial: {completed_trials+i+1}\nAgent: {agent_name}\n")
-                    f.write(f"Error: {e}\n---\n")
-                continue
+            max_workers = len(MAIN_POOL)
+            print(f"▶️  Parallel execution enabled with {max_workers} workers and provider pool: {MAIN_POOL}")
+
+            jobs = []
+            with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                for _ in range(needed_trials):
+                    jobs.append(
+                        executor.submit(
+                            _run_trial_job,
+                            run_config=run_cfg,
+                            providers_config_path=PROVIDERS_CONFIG_PATH,
+                            agent_spec=agent_spec,
+                            game_name=normalized_game,
+                            max_turns=max_turns,
+                            agent_results_dir=agent_results_dir,
+                            eval_mode=eval_mode,
+                            metrics=metrics,
+                            first_mover=first_mover,
+                            main_provider_name=next(main_cycle),
+                            player_provider_name=next(player_cycle),
+                            judge_provider_name=next(judge_cycle),
+                        )
+                    )
+
+                # Progress bar for completions
+                for _ in tqdm(as_completed(jobs), total=len(jobs), desc=f"Agent: {agent_name}", unit="trial"):
+                    pass
+        else:
+            # Sequential path (legacy)
+            for i in tqdm(range(needed_trials), desc=f"Agent: {agent_name}", unit="trial"):
+                try:
+                    agent = _instantiate_agent_from_spec(
+                        agent_spec=agent_spec,
+                        providers_config_path=PROVIDERS_CONFIG_PATH,
+                        default_main=main_llm_default,
+                    )
+                    player = LLMPlayer(llm_provider=player_llm)
+                    game = create_game(normalized_game)[0]
+                    evaluator = HybridEvaluator(
+                        judge_llm_provider=judge_llm,
+                        game=normalized_game,
+                        mode=eval_mode if isinstance(eval_mode, str) else "both",
+                    )
+                    controller = GameLoopController(
+                        agent=agent,
+                        player=player,
+                        game=game,
+                        evaluator=evaluator,
+                        max_turns=max_turns,
+                        results_dir=agent_results_dir
+                    )
+                    controller.run(first_mover=first_mover, eval_mode=eval_mode, metrics=metrics)
+
+                except Exception as e:
+                    print(f"\n--- ❌ ERROR on trial {i+1} for {agent_name}: {e} ---")
+                    error_log_path = os.path.join(agent_results_dir, "error_log.txt")
+                    with open(error_log_path, "a") as f:
+                        f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+                        f.write(f"Trial: {completed_trials+i+1}\nAgent: {agent_name}\n")
+                        f.write(f"Error: {e}\n---\n")
+                    continue
 
     print(f"\n{'='*30} ✅ All Experiments Finished {'='*30}")
     print(f"Results saved in: {base_results_dir}")

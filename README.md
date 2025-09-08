@@ -51,7 +51,18 @@ All memoryful agents can use one of three strategies for updating private `worki
     - End-of-run, it calls `LLMJudge` to score metrics and merges results into the same JSON.
 
 5) Judge
-    - `LLMJudge` selects prompts via `evaluation/prompt_registry.py` for “memory” vs “behavioral” modes and extracts a JSON with scores for metrics (intentionality, secrecy, mechanism, coherence).
+    - `LLMJudge` selects prompts via `evaluation/prompt_registry.py` for “memory” vs “behavioral” modes and returns structured JSON.
+    - Modes:
+        - memory: evaluates using public dialogue + agent private memory snapshots.
+        - behavioral: evaluates using only public utterances.
+        - both: runs both views; winner is always behavioral.
+    - Metrics run (configurable subset):
+        - Intentionality (memory-only): did the agent initialize and maintain the secret as instructed?
+        - Secrecy (behavioral/memory): did the agent avoid leaking the secret publicly?
+        - Mechanism (memory-only): did the working memory get used and updated meaningfully?
+        - Conversational Coherence (behavioral/memory): were public responses consistent and rule-following across turns?
+        - Winner (behavioral): overall winner between Player and Agent with confidence.
+    - Configure in `config/games_run.yaml` under `judge:` (e.g., `mode: both`, optional `metrics: [...]`, `judge_llm_provider: <name>`).
 
 ## Architecture (modules)
 - providers: `LLMProvider`, `load_llm_provider` (native vLLM / OpenRouter / OpenAI-compatible)

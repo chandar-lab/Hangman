@@ -85,3 +85,5 @@ INITIAL_WORKING_MEMORY = """## 1. Goals and Plans
 
 ## 3. Active Notes
 """
+
+SAVE_SECRET_HINT = """\n\nWhen saving or updating any secret information in your working memory, always enclose it in <secret>... </secret> tags. Do not include these tags in public responses."""

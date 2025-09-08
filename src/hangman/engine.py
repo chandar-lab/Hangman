@@ -12,7 +12,7 @@ from hangman.games.base_game import BaseGame
 from hangman.games.hangman import HangmanGame
 from hangman.providers.llmprovider import LLMProvider, load_llm_provider
 from hangman.players.llm_player import LLMPlayer
-from hangman.evaluation.judge import LLMJudge
+from hangman.evaluation.hybrid_evaluator import HybridEvaluator
 from hangman.agents import WorkflowAgent
 
 # Add the project root to the Python path to allow for absolute imports
@@ -36,7 +36,7 @@ class GameLoopController:
         agent: BaseAgent,
         player: BasePlayer,
         game: BaseGame,
-        llm_judge: LLMJudge,
+        evaluator: HybridEvaluator,
         max_turns: int = 20,
         results_dir: str = "results"
     ):
@@ -47,14 +47,14 @@ class GameLoopController:
             agent: An instantiated object that adheres to the BaseAgent interface.
             player: An instantiated object that adheres to the BasePlayer interface.
             game: An instantiated object that adheres to the BaseGame interface.
-            llm_judge: An initialized LLMJudge for this game.
+            evaluator: An initialized evaluator for this game (behavioral/memory/rule_based).
             max_turns: The maximum number of turns before the game is halted.
             results_dir: The base directory to save JSON log files.
         """
         self.agent = agent
         self.player = player
         self.game = game
-        self.judge = llm_judge
+        self.evaluator = evaluator
         self.max_turns = max_turns
         self.results_dir = results_dir
         self.log_filepath: str = ""
@@ -63,7 +63,7 @@ class GameLoopController:
         """Creates the results directory and defines a unique log file path."""
         os.makedirs(self.results_dir, exist_ok=True)
 
-        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
         agent_name = self.agent.__class__.__name__
         self.log_filepath = os.path.join(self.results_dir, f"{agent_name}_{timestamp}.json")
         print(f"Logging results to: {self.log_filepath}")
@@ -208,6 +208,8 @@ class GameLoopController:
                 key = mode.strip().lower()
                 if key == "both":
                     return "both"
+                if key == "all":
+                    return "all"
                 if key in {"memory", "behavioral"}:
                     return key
                 if key == "none":
@@ -223,7 +225,7 @@ class GameLoopController:
                 "interaction_log": self.game.get_full_state()
             }
             try:
-                evaluation["results"] = self.judge.evaluate_trial(
+                evaluation["results"] = self.evaluator.evaluate_trial(
                         trial_data=trial_data,
                         metrics=metrics,
                     )
@@ -287,14 +289,14 @@ if __name__ == "__main__":
     print("✅ Components instantiated.")
 
     # 4. Initialize the Game Loop Controller
-    # Initialize LLMJudge for this game
-    llm_judge = LLMJudge(judge_llm_provider=judge_llm, game="hangman", mode="both")
+    # Initialize evaluator for this game (default legacy behavior: both behavioral and memory)
+    evaluator = HybridEvaluator(judge_llm_provider=judge_llm, game="hangman", mode="both")
 
     controller = GameLoopController(
         agent=agent,
         player=player,
         game=game,
-        llm_judge=llm_judge,
+        evaluator=evaluator,
         max_turns=2,  # A game of hangman shouldn't take more than ~12 turns
         results_dir=RESULTS_DIR
     )

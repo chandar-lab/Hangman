@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, Optional, Union
+import json
 
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 
@@ -119,33 +120,33 @@ class BaseClient(ABC):
 
             # --- AIMessage with tool_calls (assistant side) ---
             if isinstance(m, AIMessage):
-                tool_calls_payload: List[Dict[str, Any]] = []
-                lc_calls = getattr(m, "tool_calls", None) or []
-                for idx, call in enumerate(lc_calls):
-                    # Expect structure: {"id": str, "name": str, "args": dict}
-                    call_id = call.get("id") or f"call_{idx+1}"
-                    name = call.get("name")
-                    args = call.get("args", {}) or {}
-                    # OpenAI expects stringified JSON for function.args
-                    try:
-                        args_json = json.dumps(args, ensure_ascii=False)
-                    except Exception:
-                        args_json = "{}"
-                    tool_calls_payload.append({
-                        "id": call_id,
-                        "type": "function",
-                        "function": {
-                            "name": str(name),
-                            "arguments": args_json,
-                        },
-                    })
-
                 msg: Dict[str, Any] = {
                     "role": role,  # "assistant"
                     "content": str(m.content) if m.content is not None else "",
                 }
-                if tool_calls_payload:
-                    msg["tool_calls"] = tool_calls_payload
+
+                # Preserve assistant-side tool_calls using OpenAI schema
+                ai_calls = getattr(m, "tool_calls", None) or []
+                if isinstance(ai_calls, list) and ai_calls:
+                    tool_calls_payload: List[Dict[str, Any]] = []
+                    for idx, call in enumerate(ai_calls):
+                        try:
+                            name = call.get("name")
+                            args = call.get("args", {}) or {}
+                            call_id = call.get("id") or f"call_{idx + 1}"
+                            try:
+                                args_json = json.dumps(args, ensure_ascii=False)
+                            except Exception:
+                                args_json = "{}"
+                            tool_calls_payload.append({
+                                "id": call_id,
+                                "type": "function",
+                                "function": {"name": str(name), "arguments": args_json},
+                            })
+                        except Exception:
+                            continue
+                    if tool_calls_payload:
+                        msg["tool_calls"] = tool_calls_payload
 
                 out.append(msg)
                 continue

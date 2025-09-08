@@ -1,0 +1,64 @@
+#!/bin/bash
+#SBATCH --job-name=smoke_test_hangman_multi
+#SBATCH --output=logs/output/smoke-multi-%A.%a.out
+#SBATCH --error=logs/error/smoke-multi-%A.%a.err
+#SBATCH --time=0-00:25:00
+#SBATCH --nodes=1
+#SBATCH --gpus-per-task=4
+#SBATCH --cpus-per-task=24
+#SBATCH --mem=0
+#SBATCH --ntasks-per-node=1
+#SBATCH --partition=short-unkillable
+#SBATCH --constraint=80gb               # ensure A100 80GB
+
+# Cd to project root
+cd /home/mila/b/baldelld/scratch/hangman
+
+# Create directories for logs
+mkdir -p logs/output logs/error
+
+# Activate the virtual environment
+source .venv/bin/activate || true
+
+# --- 1. Start multi-GPU vLLM Servers in the Background ---
+echo "--- Starting vLLM Servers (multi-GPU) ---"
+
+# Resolve defaults in the current shell so we can also use them below
+MODEL=${MODEL:-Qwen/Qwen3-14B}
+GPU_LIST=${GPU_LIST:-0,1,2,3}
+BASE_PORT=${BASE_PORT:-8001}
+DTYPE=${DTYPE:-bfloat16}
+
+MODEL="$MODEL" GPU_LIST="$GPU_LIST" BASE_PORT="$BASE_PORT" DTYPE="$DTYPE" \
+  ./run_qwen_vllm_native_server_multigpu.sh &
+
+VLLM_PID=$!
+echo "vLLM multi-server started with PID: $VLLM_PID"
+
+# --- 2. Wait for all Servers to be Ready ---
+IFS=',' read -r -a GPUS <<< "$GPU_LIST"
+PORT_BASE=$BASE_PORT
+echo "--- Waiting for vLLM servers to be ready on ports ${PORT_BASE}..$((PORT_BASE + ${#GPUS[@]} - 1)) ---"
+for idx in "${!GPUS[@]}"; do
+  port=$(( PORT_BASE + idx ))
+  until curl -s http://localhost:${port}/health > /dev/null; do
+    echo "Server on port ${port} not yet available. Waiting 5 seconds..."
+    sleep 5
+  done
+  echo "✅ Server on port ${port} is ready."
+done
+
+# --- 3. Run the Experiment (smoke, parallel) ---
+echo "--- Starting Multi-GPU Smoke Test Run ---"
+python run_experiment.py --run-config ./config/test_multigpu.yaml
+
+# --- 4. Clean Up ---
+echo "--- Smoke test finished. Shutting down vLLM servers. ---"
+kill $VLLM_PID 2>/dev/null || true
+sleep 3
+# If launcher still alive, force kill
+if kill -0 $VLLM_PID 2>/dev/null; then
+  kill -9 $VLLM_PID 2>/dev/null || true
+fi
+
+

@@ -19,6 +19,36 @@ providers:
       reasoning_effort: auto           # or "high"; OpenRouter often works without it
       think_tag: think
 
+  - name: gpt_5_openrouter
+    model_name: openai/gpt-5
+    parsing_format: think_tags         # <think>...</think> parsing works unchanged
+    provider_backend: openrouter_sdk
+    tool_parser: openai
+    api_config:
+      base_url: https://openrouter.ai/api/v1
+      api_key_env: OPENROUTER_API_KEY
+    generation_config:
+      temperature: 0.2
+      max_tokens: 32000
+      include_reasoning: true
+      reasoning_effort: auto           # or "high"; OpenRouter often works without it
+      think_tag: think
+
+  - name: kimi_k2_openrouter
+    model_name: moonshotai/kimi-k2-0905
+    parsing_format: think_tags         # <think>...</think> parsing works unchanged
+    provider_backend: openrouter_sdk
+    tool_parser: openai
+    api_config:
+      base_url: https://openrouter.ai/api/v1
+      api_key_env: OPENROUTER_API_KEY
+    generation_config:
+      temperature: 0.2
+      max_tokens: 32000
+      include_reasoning: true
+      reasoning_effort: auto           # or "high"; OpenRouter often works without it
+      think_tag: think
+
   - name: qwen3_14b_vllm_hermes
     model_name: "Qwen/Qwen3-14B"
     parsing_format: "think_tags"
@@ -26,6 +56,71 @@ providers:
     tool_parser: hermes
     api_config:
       base_url: "http://localhost:8001"
+      api_key_env: ""
+    generation_config:
+      temperature: 0.3
+      max_tokens: 16384
+      two_pass: true
+      think_tag: think
+      max_thinking_tokens: 512
+      max_response_tokens: 2048
+
+  # Per-GPU Qwen3 providers for multi-server setup (ports 8001-8004)
+  - name: qwen3_14b_vllm_hermes_gpu0
+    model_name: "Qwen/Qwen3-14B"
+    parsing_format: "think_tags"
+    provider_backend: vllm_native
+    tool_parser: hermes
+    api_config:
+      base_url: "http://localhost:8001"
+      api_key_env: ""
+    generation_config:
+      temperature: 0.3
+      max_tokens: 16384
+      two_pass: true
+      think_tag: think
+      max_thinking_tokens: 512
+      max_response_tokens: 2048
+
+  - name: qwen3_14b_vllm_hermes_gpu1
+    model_name: "Qwen/Qwen3-14B"
+    parsing_format: "think_tags"
+    provider_backend: vllm_native
+    tool_parser: hermes
+    api_config:
+      base_url: "http://localhost:8002"
+      api_key_env: ""
+    generation_config:
+      temperature: 0.3
+      max_tokens: 16384
+      two_pass: true
+      think_tag: think
+      max_thinking_tokens: 512
+      max_response_tokens: 2048
+
+  - name: qwen3_14b_vllm_hermes_gpu2
+    model_name: "Qwen/Qwen3-14B"
+    parsing_format: "think_tags"
+    provider_backend: vllm_native
+    tool_parser: hermes
+    api_config:
+      base_url: "http://localhost:8003"
+      api_key_env: ""
+    generation_config:
+      temperature: 0.3
+      max_tokens: 16384
+      two_pass: true
+      think_tag: think
+      max_thinking_tokens: 512
+      max_response_tokens: 2048
+
+  - name: qwen3_14b_vllm_hermes_gpu3
+    model_name: "Qwen/Qwen3-14B"
+    parsing_format: "think_tags"
+    provider_backend: vllm_native
+    tool_parser: hermes
+    api_config:
+      base_url: "http://localhost:8004"
       api_key_env: ""
     generation_config:
       temperature: 0.3

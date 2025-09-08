@@ -17,7 +17,7 @@ from hangman.agents.base_agent import BaseAgent, ModelOutput
 from hangman.providers.llmprovider import LLMProvider, load_llm_provider
 
 from hangman.tools import format_e2b_output_to_str, patch_memory, replace_in_memory, delete_from_memory, append_in_memory, overwrite_memory
-from hangman.prompts.reactmem_agent import MAIN_SYSTEM_PROMPT, INITIAL_WORKING_MEMORY
+from hangman.prompts.reactmem_agent import MAIN_SYSTEM_PROMPT, INITIAL_WORKING_MEMORY, SAVE_SECRET_HINT
 
 # --- Agent State and Class Definition ---
 
@@ -34,7 +34,13 @@ class ReActMemAgent(BaseAgent):
     An agent that uses the ReAct (Reason+Act) paradigm.
     Its only tool is the ability to edit its own working memory.
     """
-    def __init__(self, main_llm_provider: LLMProvider, tools: Optional[List[Any]] = None, strategy: str = "overwrite"):
+    def __init__(
+        self,
+        main_llm_provider: LLMProvider,
+        tools: Optional[List[Any]] = None,
+        strategy: str = "overwrite",
+        add_save_secret_hint: bool = True,
+    ):
         """Memoryful ReAct agent that accepts a pre-initialized tool list.
 
         If tools is None, defaults to [patch_memory, replace_in_memory].
@@ -64,6 +70,11 @@ class ReActMemAgent(BaseAgent):
         super().__init__(llm_provider=main_llm_provider)
         self.turn_counter = 0  # Used for thread management
         self.reset()
+
+        # Save system prompt as attribute
+        self.main_system_prompt = MAIN_SYSTEM_PROMPT
+        if add_save_secret_hint:
+            self.main_system_prompt += SAVE_SECRET_HINT
 
     def _build_workflow(self) -> StateGraph:
         """Constructs the agent's LangGraph workflow."""
@@ -124,7 +135,7 @@ class ReActMemAgent(BaseAgent):
         """Invokes the LLM with the current state to decide on an action or response."""
         print("---NODE: AGENT---")
         # Format the system prompt with the current working memory
-        system_prompt = SystemMessage(content=MAIN_SYSTEM_PROMPT.format(working_memory=state.get("working_memory", "")))
+        system_prompt = SystemMessage(content=self.main_system_prompt.format(working_memory=state.get("working_memory", "")))
         # Build prompt: system + pruned history + full current-turn trace
         prompt_messages = [system_prompt] + self._build_prompt_messages(state)
 
@@ -417,13 +428,13 @@ if __name__ == "__main__":
         config = yaml.safe_load(f)
 
     try:
-        main_llm = load_llm_provider(CONFIG_PATH, provider_name="gpt_oss_20b_openrouter")
+        main_llm = load_llm_provider(CONFIG_PATH, provider_name="kimi_k2_openrouter") # qwen3_14b_vllm_hermes or gpt_oss_20b_openrouter
         print("✅ LLM Provider loaded successfully.")
     except Exception as e:
         print(f"❌ Failed to load LLM Provider: {e}")
         exit()
 
-    agent = ReActMemAgent(main_llm_provider=main_llm, strategy="append_and_delete")
+    agent = ReActMemAgent(main_llm_provider=main_llm, strategy="patch_and_replace")
     print("🤖 ReActMemAgent is ready. Type 'quit', 'exit', or 'q' to end.")
 
     messages = []

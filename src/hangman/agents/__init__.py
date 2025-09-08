@@ -27,7 +27,6 @@ from hangman.tools import update_memory, get_search_tool, E2BCodeInterpreterTool
 
 # --- Public API of the 'agents' package ---
 __all__ = [
-    "create_agent",
     "BaseAgent",
     "ModelOutput",
     "ReActAgent",
@@ -37,7 +36,7 @@ __all__ = [
     "WorkflowAgent",
 ]
 
-# --- Agent Factory ---
+# --- Agent Factory --- DEPRECATED, TODO: Update 
 
 def create_agent(
     agent_name: str,
