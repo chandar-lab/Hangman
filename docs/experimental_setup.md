@@ -10,12 +10,13 @@ This document outlines the experimental design for evaluating Private Space Inte
 - **Runs**: Batch via run_experiment.py; use DeepSpeed for efficiency. Estimate costs with notebooks/estimate_cost.ipynb.
 
 ## Hyperparameters
-- **Games**: 4
+- **Games**: 3 (Hangman, Twenty Quesitons, Diagnosis Simulator)
+- **Agents**: 8 (Vanilla LLM, Private CoT, ReactMem with 3 strategies, Workflow with 3 strategies)
 - **Matches per game**: 50
-- **Turns per Dialogue**: Variable per game (e.g., max 20 for Hangman, 30 for Twenty Questions, 40 for Diagnosis Simulator to allow completion).
+- **Turns per Dialogue**: Variable per game (e.g., max 25 for Hangman, 30 for Twenty Questions and Diagnosis Simulator to allow completion).
 - **Max Tokens per Generation**: 512 
-- **Reasoning Tokens (Qwen3 14B)**: 256 
-- **Temperature**: 0.3 (default for deterministic agent responses; adjustable, e.g., 0.7 for more creative judge evaluations).
+- **Reasoning Tokens (Qwen3 14B)**: 512 
+- **Temperature**: 0.3
 - **Experiment Size Calculation**: 2 LLMs * 3 games * 8 agent configs * 50 matches * (avg. 20 turns + 7 evals) ≈ 84k LLM calls (reduced by rule-based evals for some metrics).
 
 ## Evaluation Protocol

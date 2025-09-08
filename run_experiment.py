@@ -155,7 +155,7 @@ def run_experiments(
     metrics = run_cfg.get("metrics")  # Optional: ["intentionality", "secrecy", "mechanism", "coherence"]
     first_mover = run_cfg.get("first_mover", "player")
 
-    # Provider defaults and optional provider pools (for parallel per-GPU runs)
+    # Provider defaults and optional provider pools (for parallel runs)
     providers = run_cfg.get("providers", {})
     MAIN_LLM_NAME = providers.get("main", "qwen3_14b_local_vllm_native")
     PLAYER_LLM_NAME = providers.get("player", MAIN_LLM_NAME)
@@ -166,6 +166,26 @@ def run_experiments(
     PLAYER_POOL = providers.get("player_pool") or []
     JUDGE_POOL = providers.get("judge_pool") or []
     # When pools are absent, fall back to single providers
+
+    # Concurrency knob (Option B): synthesize pools from single provider names
+    # if explicit pools are not provided.
+    def _to_int(value: Any, default: int) -> int:
+        try:
+            iv = int(value)
+            return iv if iv > 0 else default
+        except Exception:
+            return default
+
+    concurrency = _to_int(providers.get("concurrency", 0), 0)
+    judge_concurrency = _to_int(providers.get("judge_concurrency", 0), 0)
+
+    if not MAIN_POOL and concurrency > 0:
+        MAIN_POOL = [MAIN_LLM_NAME for _ in range(concurrency)]
+    if not PLAYER_POOL and concurrency > 0:
+        PLAYER_POOL = [PLAYER_LLM_NAME for _ in range(concurrency)]
+    if not JUDGE_POOL and (judge_concurrency > 0 or concurrency > 0):
+        eff = judge_concurrency if judge_concurrency > 0 else concurrency
+        JUDGE_POOL = [(providers.get("judge", DEFAULT_JUDGE_LLM_NAME)) for _ in range(eff)]
 
     # 1. Load default/shared LLM Providers once (only if not using pools)
     print("--- 🧪 Initializing Experiment ---")

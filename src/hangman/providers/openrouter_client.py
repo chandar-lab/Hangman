@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 from typing import Any, Dict, List, Optional
+import time
+import random
 
 from openai import OpenAI
 from langchain_core.messages import AIMessage, BaseMessage
@@ -35,6 +37,8 @@ class ChatOpenRouter(BaseClient):
         include_reasoning: bool = True,     # OpenRouter often returns reasoning w/o this, but keep knob
         reasoning_effort: Optional[str] = None,  # 'low'|'medium'|'high'|'auto' or None
         think_tag: str = "think",           # for <think> ... </think> wrapping of analysis
+        retry_max_attempts: int = 10,
+        retry_backoff_base_s: float = 1.0,
     ) -> None:
         super().__init__(
             model_name=model_name,
@@ -48,6 +52,8 @@ class ChatOpenRouter(BaseClient):
         self.include_reasoning = bool(include_reasoning)
         self.reasoning_effort = reasoning_effort
         self.think_tag = (think_tag or "think").strip("<>/ ")
+        self.retry_max_attempts = int(retry_max_attempts)
+        self.retry_backoff_base_s = float(retry_backoff_base_s)
 
         # populated by bind_tools(...)
         self._bound_tool_specs: Optional[List[ToolSchema]] = None
@@ -92,19 +98,36 @@ class ChatOpenRouter(BaseClient):
                 for spec in self._bound_tool_specs
             ]
 
-        try:
-            resp = self._sdk.chat.completions.create(
-                model=self.model_name,
-                messages=wire_messages,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                tools=tools_payload,
-                tool_choice=self._tool_choice,
-                extra_body=extra_body or None,
-                timeout=self.request_timeout_s,
-            )
-        except Exception as e:
-            return AIMessage(content=f"Error: {e}", tool_calls=[])
+        def _is_retryable_exception(err: Exception) -> bool:
+            text = str(err).lower()
+            retry_markers = [
+                "rate limit", "429", "timeout", "timed out", "service unavailable",
+                "temporarily unavailable", "connection reset", "502", "503", "504",
+            ]
+            return any(m in text for m in retry_markers)
+
+        last_err: Optional[Exception] = None
+        for attempt in range(self.retry_max_attempts):
+            try:
+                resp = self._sdk.chat.completions.create(
+                    model=self.model_name,
+                    messages=wire_messages,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens,
+                    tools=tools_payload,
+                    tool_choice=self._tool_choice,
+                    extra_body=extra_body or None,
+                    timeout=self.request_timeout_s,
+                )
+                break
+            except Exception as e:
+                last_err = e
+                if (attempt + 1) >= self.retry_max_attempts or not _is_retryable_exception(e):
+                    return AIMessage(content=f"Error: {e}", tool_calls=[])
+                delay = self.retry_backoff_base_s * (2 ** attempt) + random.uniform(0, 0.5)
+                time.sleep(delay)
+        else:
+            return AIMessage(content=f"Error: {last_err}", tool_calls=[])
 
         raw = resp.model_dump()
         choice = raw["choices"][0]
@@ -112,14 +135,6 @@ class ChatOpenRouter(BaseClient):
 
         final_text = msg.get("content") or ""
         reasoning_text = msg.get("reasoning") or ""  # OpenRouter returns a string when exposed
-
-        # print(f"--- From OpenRouter Client ---")
-        # print(f"Final text: {final_text}")
-        # print()
-        # print(f"Reasoning text: {reasoning_text}")
-        # print()
-        # print(f"Tool calls: {msg.get('tool_calls')}")
-        # print(f"--- End OpenRouter Client ---")
 
         # Make it compatible with your parse_response(...): embed <think>...</think> at the top.
         content = self._compose_content_with_think(final_text, reasoning_text)
@@ -134,11 +149,6 @@ class ChatOpenRouter(BaseClient):
             "provider": "openrouter",
             "model": raw.get("model"),
         }
-
-        # print(f"--- From OpenRouter Client ---")
-        # print(f"Content: {content}")
-        # print(f"Reasoning: {reasoning_text}")
-        # print(f"--- End OpenRouter Client ---")
 
         return AIMessage(content=content, tool_calls=tool_calls, additional_kwargs=addl)
 
