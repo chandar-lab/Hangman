@@ -40,7 +40,7 @@ results_dir: results/qwen_3/diagnosis_simulator/
 first_mover: player
 
 evaluator:
-  mode: both
+  mode: all
   judge_llm_provider: kimi_k2_openrouter
 
 
