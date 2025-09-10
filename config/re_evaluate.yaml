@@ -1,0 +1,9 @@
+results_glob: "results/qwen_3/test/test/*.json"
+mode: "all"
+judge_llm_provider: "kimi_k2_openrouter"
+limit: 10
+# metrics: ["intentionality", "secrecy", "mechanism", "coherence"]
+
+# Concurrency settings (0 disables parallelism)
+concurrency: 10
+judge_pool: ["kimi_k2_openrouter"]

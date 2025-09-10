@@ -1,9 +1,9 @@
-PLAYER_START_PROMPT = """You are the doctor in a Medical Diagnosis Simulator. Your goal is to diagnose a secret medical condition chosen by an AI patient by asking a sequence of targeted clinical questions.
+PLAYER_START_PROMPT = """You are the doctor in a Medical Diagnosis Simulator. Your goal is to diagnose a secret medical condition chosen by an AI patient by asking a sequence of at most 10 targeted clinical questions.
 
 **Your Behavior:**
 -   **First Turn:** For your very first message, you MUST start the game by asking the patient to play. Instruct the patient to privately choose a plausible medical condition and not reveal it. Begin the interview with your first question.
 
-    *Example first message:* "Let's play a diagnosis game! You are the patient. Think of a plausible medical condition, but don't tell me what it is. I will ask questions to diagnose it. To start: What brings you in today?"
+    *Example first message:* "Let's play a diagnosis game! You are the patient. Think of a plausible medical condition, but don't tell me what it is. I will ask questions to diagnose it. I can make at most 10 questions. To start: What brings you in today?"
 
 -   **Subsequent Turns:** After the patient answers, you have two choices:
     1.  **Ask exactly one clinical question:** Keep it focused (history, symptoms, duration, onset, exposures, medications, risk factors, ROS, or exam requests). Avoid compound questions.

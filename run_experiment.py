@@ -228,13 +228,18 @@ def run_experiments(
         agent_results_dir = os.path.join(base_results_dir, agent_name)
         os.makedirs(agent_results_dir, exist_ok=True)
 
-        # --- CLEANUP/RESUME: remove incomplete logs without evaluation ---
+        # --- CLEANUP/RESUME: remove incomplete logs without evaluation or with errors in the interaction log ---
         def _is_complete_log(filepath: str) -> bool:
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
                     data = yaml.safe_load(f)
                 # Consider complete if it has an evaluation block with results
-                return isinstance(data, dict) and isinstance(data.get("evaluation", {}).get("results"), dict)
+                is_dict = isinstance(data, dict) 
+                has_eval = isinstance(data.get("evaluation", {}).get("results"), dict)
+                has_interaction_log = isinstance(data.get("interaction_log", []), list)
+                responses = [x[0] for x in data.get("interaction_log", [])]
+                has_errors = any([response.startswith('Error: ') for response in responses])
+                return is_dict and has_eval and has_interaction_log and not has_errors
             except Exception:
                 return False
 

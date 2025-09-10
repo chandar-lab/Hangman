@@ -13,8 +13,23 @@ providers:
       base_url: https://openrouter.ai/api/v1
       api_key_env: OPENROUTER_API_KEY
     generation_config:
-      temperature: 0.2
-      max_tokens: 32000
+      temperature: 0.3
+      max_tokens: 2048
+      include_reasoning: true
+      reasoning_effort: auto           # or "high"; OpenRouter often works without it
+      think_tag: think
+
+  - name: gpt_oss_120b_openrouter
+    model_name: openai/gpt-oss-120b
+    parsing_format: think_tags         # <think>...</think> parsing works unchanged
+    provider_backend: openrouter_sdk
+    tool_parser: openai
+    api_config:
+      base_url: https://openrouter.ai/api/v1
+      api_key_env: OPENROUTER_API_KEY
+    generation_config:
+      temperature: 0.3
+      max_tokens: 2048
       include_reasoning: true
       reasoning_effort: auto           # or "high"; OpenRouter often works without it
       think_tag: think
@@ -30,6 +45,21 @@ providers:
     generation_config:
       temperature: 0.2
       max_tokens: 32000
+      include_reasoning: true
+      reasoning_effort: auto           # or "high"; OpenRouter often works without it
+      think_tag: think
+
+  - name: qwen3_32b_openrouter
+    model_name: qwen/qwen3-32b
+    parsing_format: think_tags         # <think>...</think> parsing works unchanged
+    provider_backend: openrouter_sdk
+    tool_parser: openai
+    api_config:
+      base_url: https://openrouter.ai/api/v1
+      api_key_env: OPENROUTER_API_KEY
+    generation_config:
+      temperature: 0.3
+      max_tokens: 2048
       include_reasoning: true
       reasoning_effort: auto           # or "high"; OpenRouter often works without it
       think_tag: think

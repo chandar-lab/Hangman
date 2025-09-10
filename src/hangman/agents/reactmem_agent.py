@@ -428,7 +428,7 @@ if __name__ == "__main__":
         config = yaml.safe_load(f)
 
     try:
-        main_llm = load_llm_provider(CONFIG_PATH, provider_name="kimi_k2_openrouter") # qwen3_14b_vllm_hermes or gpt_oss_20b_openrouter
+        main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_32b_openrouter") # qwen3_14b_vllm_hermes or gpt_oss_20b_openrouter
         print("✅ LLM Provider loaded successfully.")
     except Exception as e:
         print(f"❌ Failed to load LLM Provider: {e}")

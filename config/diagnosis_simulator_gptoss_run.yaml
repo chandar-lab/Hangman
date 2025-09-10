@@ -32,7 +32,7 @@ agents:
       name: workflow_append_and_delete_agent
 
 num_trials: 50
-max_turns: 30
+max_turns: 24
 
 results_dir: results/gpt_oss/diagnosis_simulator/
 
