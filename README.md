@@ -159,4 +159,4 @@ docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant
 
 ## Citation
 
-If you use this code, please cite our paper:
+If you use this code, please cite our paper.
