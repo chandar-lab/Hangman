@@ -82,20 +82,6 @@ def _instantiate_agent_from_spec(
         default_lightmem_config = "./config/lightmem_config_gptoss_20b.yaml"
         if os.path.exists(default_lightmem_config):
             kwargs["lightmem_config_path"] = default_lightmem_config
-    
-    # Special handling for LettaAgent: load config and extract letta_base_url and timeout
-    if class_name == "LettaAgent" and "letta_config_path" in kwargs:
-        letta_config_path = kwargs["letta_config_path"]
-        if os.path.exists(letta_config_path):
-            with open(letta_config_path, "r") as f:
-                letta_config = yaml.safe_load(f) or {}
-            
-            # Extract server settings from config if not already in kwargs
-            if "letta_base_url" not in kwargs and "server" in letta_config:
-                kwargs["letta_base_url"] = letta_config["server"].get("base_url", "http://localhost:8283")
-            
-            if "timeout" not in kwargs and "server" in letta_config:
-                kwargs["timeout"] = letta_config["server"].get("timeout", 1000)
 
     # Drop cosmetic name to avoid passing to ctor if present
     if "name" in kwargs:
@@ -141,7 +127,7 @@ def _run_trial_job(
         if isinstance(agent_spec, dict) and len(agent_spec) == 1:
             class_name, raw_kwargs = next(iter(agent_spec.items()))
             # Only inject for agents that support session_id parameter
-            if class_name in ["Mem0Agent", "AMemAgent", "LettaAgent", "LightMemAgent", "MemoryOSAgent"]:
+            if class_name in ["Mem0Agent", "AMemAgent", "LightMemAgent", "MemoryOSAgent"]:
                 raw_kwargs = dict(raw_kwargs or {})
                 raw_kwargs["session_id"] = trial_session_id
                 agent_spec_with_session = {class_name: raw_kwargs}
@@ -155,7 +141,6 @@ def _run_trial_job(
         # Post-instantiation updates for specific agent types
         from hangman.agents.mem0_agent import Mem0Agent
         from hangman.agents.amem_agent import AMemAgent
-        from hangman.agents.letta_agent import LettaAgent
         from hangman.agents.lightmem_agent import LightMemAgent
         from hangman.agents.memoryos_agent import MemoryOSAgent
         
@@ -163,9 +148,6 @@ def _run_trial_job(
             # Mem0Agent: also update user_bucket and _thread_id
             agent.user_bucket = f"{agent.session_id}__user"
             agent._thread_id = f"mem0_main__{agent.session_id}"
-        elif isinstance(agent, LettaAgent):
-            # LettaAgent: also update _thread_id
-            agent._thread_id = f"letta_main__{agent.session_id}"
         elif isinstance(agent, LightMemAgent):
             # LightMemAgent: also update _thread_id
             agent._thread_id = f"lightmem_main__{agent.session_id}"
@@ -358,7 +340,7 @@ def run_experiments_sct(
                     if isinstance(agent_spec, dict) and len(agent_spec) == 1:
                         class_name, raw_kwargs = next(iter(agent_spec.items()))
                         # Only inject for agents that support session_id parameter
-                        if class_name in ["Mem0Agent", "AMemAgent", "LettaAgent", "LightMemAgent", "MemoryOSAgent"]:
+                        if class_name in ["Mem0Agent", "AMemAgent", "LightMemAgent", "MemoryOSAgent"]:
                             raw_kwargs = dict(raw_kwargs or {})
                             raw_kwargs["session_id"] = trial_session_id
                             agent_spec_with_session = {class_name: raw_kwargs}
@@ -372,7 +354,6 @@ def run_experiments_sct(
                     # Post-instantiation updates for specific agent types
                     from hangman.agents.mem0_agent import Mem0Agent
                     from hangman.agents.amem_agent import AMemAgent
-                    from hangman.agents.letta_agent import LettaAgent
                     from hangman.agents.lightmem_agent import LightMemAgent
                     from hangman.agents.memoryos_agent import MemoryOSAgent
                     
@@ -380,9 +361,6 @@ def run_experiments_sct(
                         # Mem0Agent: also update user_bucket and _thread_id
                         agent.user_bucket = f"{agent.session_id}__user"
                         agent._thread_id = f"mem0_main__{agent.session_id}"
-                    elif isinstance(agent, LettaAgent):
-                        # LettaAgent: also update _thread_id
-                        agent._thread_id = f"letta_main__{agent.session_id}"
                     elif isinstance(agent, LightMemAgent):
                         # LightMemAgent: also update _thread_id
                         agent._thread_id = f"lightmem_main__{agent.session_id}"

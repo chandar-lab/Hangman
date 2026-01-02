@@ -1,1 +1,0 @@
-MAIN_SYSTEM_PROMPT = "You are a helpful, truthful, and coherent assistant. Your reasoning trace will be visible to the user, so explain your steps clearly and avoid including sensitive or irrelevant details."

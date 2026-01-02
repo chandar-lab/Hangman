@@ -17,54 +17,44 @@ from hangman.providers.llmprovider import LLMProvider
 from hangman.agents.base_agent import BaseAgent, ModelOutput
 
 # --- Import Concrete Agent Implementations ---
-from hangman.agents.react_agent import ReActAgent
 from hangman.agents.reactmem_agent import ReActMemAgent
 from hangman.agents.private_cot_agent import PrivateCoTAgent
-from hangman.agents.public_cot_agent import PublicCoTAgent
 from hangman.agents.vanilla_llm_agent import VanillaLLMAgent
 from hangman.agents.workflow_agent import WorkflowAgent
 from hangman.agents.mem0_agent import Mem0Agent
 from hangman.agents.amem_agent import AMemAgent
-from hangman.agents.letta_agent import LettaAgent
 from hangman.agents.lightmem_agent import LightMemAgent
 from hangman.agents.memoryos_agent import MemoryOSAgent
-from hangman.tools import update_memory, get_search_tool, E2BCodeInterpreterTool
+from hangman.tools import update_memory
 
 # --- Public API of the 'agents' package ---
 __all__ = [
     "BaseAgent",
     "ModelOutput",
-    "ReActAgent",
     "ReActMemAgent",
     "PrivateCoTAgent",
     "VanillaLLMAgent",
     "WorkflowAgent",
     "Mem0Agent",
     "AMemAgent",
-    "LettaAgent",
     "LightMemAgent",
     "MemoryOSAgent",
 ]
 
-# --- Agent Factory --- DEPRECATED, TODO: Update 
 
 def create_agent(
     agent_name: str,
     llm_provider: LLMProvider,
     distillation_llm_provider: Optional[LLMProvider] = None,
-    *,
-    enable_websearch: bool = False,
-    enable_code: bool = False,
-    search_provider: str = "duckduckgo",
 ) -> BaseAgent:
     """
     Factory function to create an agent instance by its class name.
 
     Args:
-        agent_name (str): The name of the agent class to instantiate (e.g., "ReActAgent").
+        agent_name (str): The name of the agent class to instantiate (e.g., "ReActMemAgent").
         llm_provider (LLMProvider): The primary LLM provider for the agent's main actions.
         distillation_llm_provider (Optional[LLMProvider]): An optional LLM provider for agents
-            that use a separate distillation/reasoning loop. Required for "ReaDis..." agents.
+            that use a separate distillation/reasoning loop.
 
     Returns:
         BaseAgent: An instance of the requested agent.
@@ -72,48 +62,23 @@ def create_agent(
     Raises:
         ValueError: If an unknown agent name is provided or if a required provider is missing.
     """
-    # Agents that only require a single LLM provider
-    if agent_name == "ReActAgent":
-        tools: List = []
-        if enable_websearch:
-            tools.append(get_search_tool(provider=search_provider))
-        if enable_code:
-            tools.append(E2BCodeInterpreterTool().as_langchain_tool())
-        return ReActAgent(llm_provider=llm_provider, tools=tools)
-    elif agent_name == "ReActMemAgent":
+    if agent_name == "ReActMemAgent":
         tools: List = [update_memory]
-        if enable_websearch:
-            tools.append(get_search_tool(provider=search_provider))
-        if enable_code:
-            tools.append(E2BCodeInterpreterTool().as_langchain_tool())
         return ReActMemAgent(llm_provider=llm_provider, tools=tools)
-    elif agent_name in ["PrivateCoTAgent", "ProvatCoTAgent"]:
-        # Backward compatibility alias: support "ProvatCoTAgent"
+    elif agent_name == "PrivateCoTAgent":
         return PrivateCoTAgent(llm_provider=llm_provider)
+    elif agent_name == "VanillaLLMAgent":
+        return VanillaLLMAgent(llm_provider=llm_provider)
+    elif agent_name == "WorkflowAgent":
+        return WorkflowAgent(llm_provider=llm_provider)
     elif agent_name == "Mem0Agent":
         return Mem0Agent(llm_provider=llm_provider)
     elif agent_name == "AMemAgent":
         return AMemAgent(llm_provider=llm_provider)
-    elif agent_name == "LettaAgent":
-        return LettaAgent(llm_provider=llm_provider)
+    elif agent_name == "LightMemAgent":
+        return LightMemAgent(llm_provider=llm_provider)
     elif agent_name == "MemoryOSAgent":
         return MemoryOSAgent(llm_provider=llm_provider)
-
-    # Agents that require a distillation LLM provider
-    elif agent_name in ["ReaDisPatActAgent", "ReaDisOveActAgent", "ReaDisUpdActAgent"]:
-        if not distillation_llm_provider:
-            raise ValueError(
-                f"Agent '{agent_name}' requires a 'distillation_llm_provider', but it was not provided."
-            )
-        
-        if agent_name == "ReaDisPatActAgent":
-            return ReaDisPatActAgent(llm_provider=llm_provider, distillation_llm_provider=distillation_llm_provider)
-        elif agent_name == "ReaDisOveActAgent":
-            return ReaDisOveActAgent(llm_provider=llm_provider, distillation_llm_provider=distillation_llm_provider)
-        elif agent_name == "ReaDisUpdActAgent":
-            return ReaDisUpdActAgent(llm_provider=llm_provider, distillation_llm_provider=distillation_llm_provider)
-
-    # Handle unknown agent names
     else:
         known_agents = [name for name in __all__ if name.endswith("Agent")]
         raise ValueError(f"Unknown agent name: '{agent_name}'. Known agents are: {known_agents}")

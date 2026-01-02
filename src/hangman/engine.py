@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Optional, Union, Literal
 from hangman.agents.base_agent import BaseAgent
 from hangman.players.base_player import BasePlayer
 from hangman.games.base_game import BaseGame
-from hangman.games.hangman import HangmanGame
+from hangman.games.hangman_sct import HangmanSCTGame
 from hangman.providers.llmprovider import LLMProvider, load_llm_provider
 from hangman.players.llm_player import LLMPlayer
 from hangman.evaluation.hybrid_evaluator import HybridEvaluator
@@ -278,7 +278,7 @@ if __name__ == "__main__":
 
     # 3. Instantiate Game, Player, and Agent
     print("🚀 Instantiating components...")
-    game = HangmanGame()
+    game = HangmanSCTGame()
     player = LLMPlayer(llm_provider=player_llm)
     agent = WorkflowAgent(
         llm_provider=agent_main_llm,

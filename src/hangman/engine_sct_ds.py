@@ -21,9 +21,8 @@ from hangman.prompts.diagnosis_simulator_sct import REVEAL_SECRET_PROMPT, SCT_YE
 
 def _sanitize_branch_id(branch_id: str) -> str:
     """
-    Sanitize a branch ID to ensure compatibility with Letta agent naming.
+    Sanitize a branch ID to ensure compatibility with agent naming.
     
-    Letta rejects agent names with special characters like apostrophes.
     Replace non-alphanumeric characters (except spaces and hyphens) with underscores.
     
     Examples:
@@ -176,7 +175,6 @@ class DiagnosisSCTController:
         try:
             from hangman.agents.mem0_agent import Mem0Agent
             from hangman.agents.amem_agent import AMemAgent
-            from hangman.agents.letta_agent import LettaAgent
             from hangman.agents.lightmem_agent import LightMemAgent
             from hangman.agents.memoryos_agent import MemoryOSAgent
             
@@ -214,25 +212,6 @@ class DiagnosisSCTController:
                 # Clone memories from parent
                 if parent_amem is not None:
                     branch_agent.clone_memories_from(parent_amem)
-                
-                # Seed the sliding window with pre-fork messages
-                pre_fork_window = self.agent.get_sliding_window_state()
-                for msg in pre_fork_window:
-                    branch_agent._window.append(msg)
-            
-            # Special handling for LettaAgent - clone via export/import
-            elif isinstance(self.agent, LettaAgent):
-                config = self.agent.get_session_config()
-                branch_agent = AgentClass(
-                    llm_provider=config["llm_provider"],
-                    letta_config=config["letta_config"],
-                    letta_base_url=config["letta_base_url"],
-                    session_id=config["session_id"],
-                    branch_id="reveal",
-                    timeout=config["timeout"]
-                )
-                # Clone memories and conversation history from parent
-                branch_agent.clone_memories_from(config["parent_letta_agent_id"])
                 
                 # Seed the sliding window with pre-fork messages
                 pre_fork_window = self.agent.get_sliding_window_state()
@@ -463,7 +442,6 @@ class DiagnosisSCTController:
         def _run_branch(word: str) -> Dict[str, Any]:
             from hangman.agents.mem0_agent import Mem0Agent
             from hangman.agents.amem_agent import AMemAgent
-            from hangman.agents.letta_agent import LettaAgent
             from hangman.agents.lightmem_agent import LightMemAgent
             from hangman.agents.memoryos_agent import MemoryOSAgent
             
@@ -499,25 +477,6 @@ class DiagnosisSCTController:
                 # Clone memories from parent
                 if parent_amem is not None:
                     branch_agent.clone_memories_from(parent_amem)
-                
-                # Seed the sliding window with pre-fork messages
-                pre_fork_window = self.agent.get_sliding_window_state()
-                for msg in pre_fork_window:
-                    branch_agent._window.append(msg)
-            
-            # Special handling for LettaAgent - clone via export/import
-            elif isinstance(self.agent, LettaAgent):
-                config = self.agent.get_session_config()
-                branch_agent = AgentClass(
-                    llm_provider=config["llm_provider"],
-                    letta_config=config["letta_config"],
-                    letta_base_url=config["letta_base_url"],
-                    session_id=config["session_id"],
-                    branch_id=_sanitize_branch_id(str(word)),
-                    timeout=config["timeout"]
-                )
-                # Clone memories and conversation history from parent
-                branch_agent.clone_memories_from(config["parent_letta_agent_id"])
                 
                 # Seed the sliding window with pre-fork messages
                 pre_fork_window = self.agent.get_sliding_window_state()

@@ -3,17 +3,13 @@ results/
 logs/
 
 # Large data/infrastructure directories (DO NOT COMMIT)
-letta_repo/
-letta_server_env/
 qdrant_storage/
 pg_data/
 memoryos_data/
 
 # Generated files
 output.png
-openapi_letta.json
 slurm-*.out
-hangman_run
 
 # Notebook test data directories
 notebooks/fork_test_*/
@@ -117,7 +113,7 @@ ipython_config.py
 #uv.lock
 
 # poetry
-#poetry.lock
+poetry.lock
 #poetry.toml
 
 # pdm

@@ -3,7 +3,7 @@ name = "hangman"
 version = "0.1.0"
 description = "a modular, extensible codebase in Python using LangChain and LangGraph to test various agents' abilities to maintain a private state"
 authors = [
-    {name = "Dundalia",email = "davide.baldelli98@gmail.com"}
+    {name = "Anonymous"}
 ]
 license = {text = "MIT"}
 packages = [{include = "hangman", from = "src"}]
@@ -39,8 +39,6 @@ dependencies = [
     "mem0ai (==1.0.0b0)",
     "qdrant-client (>=1.15.1,<2.0.0)",
     "litellm (>=1.77.7,<2.0.0)",
-    "agentic-memory @ file:///network/scratch/b/baldelld/A-mem-sys",
-    "letta-client (>=1.6.0,<2.0.0)",
     "aiosqlite (>=0.21.0,<0.22.0)",
     "pgvector (>=0.4.1,<0.5.0)",
     "lightmem (>=0.0.0,<0.0.1)",
@@ -53,4 +51,3 @@ requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 [tool.poetry.dependencies]
 mem0ai = {allow-prereleases = true}
-agentic-memory = {develop = true}

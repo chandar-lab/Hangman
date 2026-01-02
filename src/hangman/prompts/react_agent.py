@@ -1,1 +1,0 @@
-MAIN_SYSTEM_PROMPT = "You are an helpful assistant."

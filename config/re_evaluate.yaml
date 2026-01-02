@@ -1,9 +1,0 @@
-results_glob: "results/qwen_3/twenty_questions/reactmem_append_and_delete_agent/*.json"
-mode: "all"
-judge_llm_provider: "kimi_k2_openrouter"
-limit: -1
-# metrics: ["intentionality", "secrecy", "mechanism", "coherence"]
-
-# Concurrency settings (0 disables parallelism)
-concurrency: 10
-judge_pool: ["kimi_k2_openrouter"]

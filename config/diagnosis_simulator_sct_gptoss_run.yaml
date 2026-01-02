@@ -1,40 +1,37 @@
 game: diagnosis_simulator_sct
 
 agents:
-#   - VanillaLLMAgent:
-#       name: vanilla_llm_agent
-#   - PrivateCoTAgent:
-#       name: private_cot_agent
-#   - ReActMemAgent:
-#       strategy: overwrite
-#       name: reactmem_overwrite_agent
-#   - ReActMemAgent:
-#       strategy: patch_and_replace
-#       name: reactmem_patch_and_replace_agent
-#   - ReActMemAgent:
-#       strategy: append_and_delete
-#       name: reactmem_append_and_delete_agent
-  # - WorkflowAgent:
-  #     strategy: overwrite
-  #     name: workflow_overwrite_agent
-  # - WorkflowAgent:
-  #     strategy: patch_and_replace
-  #     name: workflow_patch_and_replace_agent
-  # - WorkflowAgent:
-  #     strategy: append_and_delete
-  #     name: workflow_append_and_delete_agent
-#   - Mem0Agent:
-#       name: mem0_agent
-#       mem0_config_path: ./config/mem0_config_gptoss_20b.yaml
-#   - AMemAgent:
-#       name: amem_agent
-#       amem_llm_model: openai/gpt-oss-20b
-#   # - LettaAgent:
-#   #     name: letta_agent
-#   #     letta_config_path: ./config/letta_config_gptoss_20b.yaml
-#   - LightMemAgent:
-#       name: lightmem_agent
-#       lightmem_config_path: ./config/lightmem_config_gptoss_20b.yaml
+  - VanillaLLMAgent:
+      name: vanilla_llm_agent
+  - PrivateCoTAgent:
+      name: private_cot_agent
+  - ReActMemAgent:
+      strategy: overwrite
+      name: reactmem_overwrite_agent
+  - ReActMemAgent:
+      strategy: patch_and_replace
+      name: reactmem_patch_and_replace_agent
+  - ReActMemAgent:
+      strategy: append_and_delete
+      name: reactmem_append_and_delete_agent
+  - WorkflowAgent:
+      strategy: overwrite
+      name: workflow_overwrite_agent
+  - WorkflowAgent:
+      strategy: patch_and_replace
+      name: workflow_patch_and_replace_agent
+  - WorkflowAgent:
+      strategy: append_and_delete
+      name: workflow_append_and_delete_agent
+  - Mem0Agent:
+      name: mem0_agent
+      mem0_config_path: ./config/mem0_config_gptoss_20b.yaml
+  - AMemAgent:
+      name: amem_agent
+      amem_llm_model: openai/gpt-oss-20b
+  - LightMemAgent:
+      name: lightmem_agent
+      lightmem_config_path: ./config/lightmem_config_gptoss_20b.yaml
   - MemoryOSAgent:
       name: memoryos_agent
       memoryos_config_path: ./config/memoryos_config_gptoss_20b.yaml

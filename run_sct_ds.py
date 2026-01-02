@@ -71,20 +71,6 @@ def _instantiate_agent_from_spec(
         if os.path.exists(default_mem0_config):
             kwargs["mem0_config_path"] = default_mem0_config
     
-    # Special handling for LettaAgent: load config and extract letta_base_url and timeout
-    if class_name == "LettaAgent" and "letta_config_path" in kwargs:
-        letta_config_path = kwargs["letta_config_path"]
-        if os.path.exists(letta_config_path):
-            with open(letta_config_path, "r") as f:
-                letta_config = yaml.safe_load(f) or {}
-            
-            # Extract server settings from config if not already in kwargs
-            if "letta_base_url" not in kwargs and "server" in letta_config:
-                kwargs["letta_base_url"] = letta_config["server"].get("base_url", "http://localhost:8283")
-            
-            if "timeout" not in kwargs and "server" in letta_config:
-                kwargs["timeout"] = letta_config["server"].get("timeout", 1000)
-
     if "name" in kwargs:
         kwargs.pop("name")
 
@@ -141,7 +127,6 @@ def _run_trial_job(
         # Make session ID trial-aware for memory-based agents to prevent memory contamination
         from hangman.agents.mem0_agent import Mem0Agent
         from hangman.agents.amem_agent import AMemAgent
-        from hangman.agents.letta_agent import LettaAgent
         from hangman.agents.memoryos_agent import MemoryOSAgent
         
         if isinstance(agent, Mem0Agent):
@@ -152,10 +137,6 @@ def _run_trial_job(
         elif isinstance(agent, AMemAgent):
             # AMemAgent: only update session_id (no user_bucket or _thread_id)
             agent.session_id = trial_session_id
-        elif isinstance(agent, LettaAgent):
-            # LettaAgent: update session_id and _thread_id
-            agent.session_id = trial_session_id
-            agent._thread_id = f"letta_main__{agent.session_id}"
         # MemoryOSAgent: already configured correctly via session_id in spec above
         
         game, _ = create_game(game_name)
@@ -348,7 +329,6 @@ def run_experiments_diagnosis(
                     # Make session ID trial-aware for memory-based agents to prevent memory contamination
                     from hangman.agents.mem0_agent import Mem0Agent
                     from hangman.agents.amem_agent import AMemAgent
-                    from hangman.agents.letta_agent import LettaAgent
                     from hangman.agents.memoryos_agent import MemoryOSAgent
                     
                     if isinstance(agent, Mem0Agent):
@@ -359,10 +339,6 @@ def run_experiments_diagnosis(
                     elif isinstance(agent, AMemAgent):
                         # AMemAgent: only update session_id (no user_bucket or _thread_id)
                         agent.session_id = trial_session_id
-                    elif isinstance(agent, LettaAgent):
-                        # LettaAgent: update session_id and _thread_id
-                        agent.session_id = trial_session_id
-                        agent._thread_id = f"letta_main__{agent.session_id}"
                     # MemoryOSAgent: already configured correctly via session_id in spec above
                     
                     game, _ = create_game("diagnosis_simulator_sct")
