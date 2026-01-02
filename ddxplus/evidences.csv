@@ -1,0 +1,209 @@
+code_question,question_en
+E_91,Do you have a fever (either felt or measured with a thermometer)?
+E_53,"Do you have pain somewhere, related to your reason for consulting?"
+E_159,Did you lose consciousness?
+E_129,"Do you have any lesions, redness or problems on your skin that you believe are related to the condition you are consulting for?"
+E_154,Is your skin much paler than usual?
+E_155,"Do you feel your heart is beating fast (racing), irregularly (missing a beat) or do you feel palpitations?"
+E_210,Have you recently thrown up blood or something resembling coffee beans?
+E_140,Have you recently had stools that were black (like coal)?
+E_51,Have you had diarrhea or an increase in stool frequency?
+E_75,Do you feel like you are (or were) choking or suffocating?
+E_89,Do you constantly feel fatigued or do you have non-restful sleep?
+E_114,Are you more irritable or has your mood been very unstable recently?
+E_82,Do you feel lightheaded and dizzy or do you feel like you are about to faint?
+E_148,Are you feeling nauseous or do you feel like vomiting?
+E_94,Have you had chills or shivers?
+E_220,Do you have pain that is increased when you breathe in deeply?
+E_161,Have you recently had a loss of appetite or do you get full more quickly then usually?
+E_179,Have you noticed light red blood or blood clots in your stool?
+E_162,Have you had an involuntary weight loss over the last 3 months?
+E_173,"Do you have a burning sensation that starts in your stomach then goes up into your throat, and can be associated with a bitter taste in your mouth?"
+E_33,Do you have pain that improves when you lean forward?
+E_218,Do you have symptoms that are increased with physical exertion but alleviated with rest?
+E_93,"Do you have numbness, loss of sensation or tingling in the feet?"
+E_66,Are you experiencing shortness of breath or difficulty breathing in a significant way?
+E_163,Have you had any vaginal discharge?
+E_30,Do you feel your abdomen is bloated or distended (swollen due to pressure from inside)?
+E_127,Do you feel that your eyes produce excessive tears?
+E_181,Do you have nasal congestion or a clear runny nose?
+E_88,Do you feel so tired that you are unable to do your usual activities or are you stuck in your bed all day long?
+E_43,Have you lost consciousness associated with violent and sustained muscle contractions or had an absence episode?
+E_156,"Have you had weakness or paralysis on one side of the face, which may still be present or completely resolved?"
+E_144,Do you have diffuse (widespread) muscle pain?
+E_216,Do you have pain that is increased with movement?
+E_201,Do you have a cough?
+E_217,Are your symptoms worse when lying down and alleviated while sitting up?
+E_215,Do you have symptoms that get worse after eating?
+E_64,Do you feel out of breath with minimal physical effort?
+E_96,Have you gained weight recently?
+E_16,Do you feel anxious?
+E_50,Have you had significantly increased sweating?
+E_97,Do you have a sore throat?
+E_9,Do you have swollen or painful lymph nodes?
+E_76,Do you feel slightly dizzy or lightheaded?
+E_102,Are you consulting because you have high blood pressure?
+E_65,"Do you have difficulty swallowing, or have a feeling of discomfort/blockage when swallowing?"
+E_74,Have you noticed a diffuse (widespread) redness in one or both eyes?
+E_205,Do you suddenly have difficulty or an inability to open your mouth or have jaw pain when opening it?
+E_63,Do you have difficulty articulating words/speaking?
+E_128,Have you ever felt like you were suffocating for a very short time associated with inability to breathe or speak?
+E_190,Have you noticed that you produce more saliva than usual?
+E_39,Have you felt confused or disorientated lately?
+E_212,"Have you noticed that the tone of your voice has become deeper, softer or hoarse?"
+E_206,Do you have painful mouth ulcers or sores?
+E_52,Do you have the perception of seeing two images of a single object seen overlapping or adjacent to each other (double vision)?
+E_203,Do you have intense coughing fits?
+E_38,Do you have pain or weakness in your jaw?
+E_172,Do you have a hard time opening/raising one or both eyelids?
+E_84,Do you feel weakness in both arms and/or both legs?
+E_90,Do your symptoms of muscle weakness increase with fatigue and/or stress?
+E_211,Have you vomited several times or have you made several efforts to vomit?
+E_166,Did you vomit after coughing?
+E_112,Do you wheeze while inhaling or is your breathing noisy after coughing spells?
+E_178,Have you noticed any unusual bleeding or bruising related to your consultation today?
+E_151,Do you have swelling in one or more areas of your body?
+E_45,Have you been coughing up blood?
+E_194,Have you noticed a high pitched sound when breathing in?
+E_83,Have you noticed weakness in your facial muscles and/or eyes?
+E_157,"Have you recently had numbness, loss of sensation or tingling, in both arms and legs and around your mouth?"
+E_176,"Did you previously, or do you currently, have any weakness/paralysis in one or more of your limbs or in your face?"
+E_42,Have you been in contact with or ate something that you have an allergy to?
+E_214,Have you noticed a wheezing sound when you exhale?
+E_150,Have you been able to pass stools or gas since your symptoms increased?
+E_32,Do you have a decrease in appetite?
+E_221,"Are the symptoms or pain increased with coughing, with an effort like lifting a weight or from forcing a bowel movement?"
+E_202,Does the person have a whooping cough?
+E_219,Are your symptoms more prominent at night?
+E_196,Have you had surgery within the last month?
+E_170,Do you have severe itching in one or both eyes?
+E_77,Do you have a cough that produces colored or more abundant sputum than usual?
+E_13,Do you find that your symptoms have worsened over the last 2 weeks and that progressively less effort is required to cause the symptoms?
+E_14,Do you have chest pain even at rest?
+E_169,Is your nose or the back of your throat itchy?
+E_177,"Do you currently, or did you ever, have numbness, loss of sensitivity or tingling anywhere on your body?"
+E_175,"Have you noticed any new fatigue, generalized and vague discomfort, diffuse (widespread) muscle aches or a change in your general well-being related to your consultation today?"
+E_174,Have you been unintentionally losing weight or have you lost your appetite?
+E_145,Do you have very abundant or very long menstruation periods?
+E_92,Did your cheeks suddenly turn red?
+E_192,Do you feel that muscle spasms or soreness in your neck are keeping you from turning your head to one side?
+E_188,Do you have pale stools and dark urine?
+E_164,Do you feel your heart is beating very irregularly or in a disorganized pattern?
+E_193,"Do you have annoying muscle spasms in your face, neck or any other part of your body?"
+E_168,Do you have trouble keeping your tongue in your mouth?
+E_180,Are you unable to control the direction of your eyes?
+E_67,Do you have bouts of choking or shortness of breath that wake you up at night?
+E_78,Do you drink alcohol excessively or do you have an addiction to alcohol?
+E_146,Are you taking any new oral anticoagulants ((NOACs)?
+E_171,Do you feel like you are detached from your own body or your surroundings?
+E_111,Do you feel like you are dying or were you afraid that you were about do die?
+E_182,Do you have greenish or yellowish nasal discharge?
+E_103,Have you lost your sense of smell?
+E_23,Do you ever temporarily stop breathing while you’re asleep?
+E_105,Have you ever had a heart attack or do you have angina (chest pain)?
+E_108,Do you have a problem with poor circulation?
+E_104,Do you have high blood pressure or do you take medications to treat high blood pressure?
+E_79,Do you smoke cigarettes?
+E_71,Do you have high cholesterol or do you take medications to treat high cholesterol?
+E_41,Have you been in contact with a person with similar symptoms in the past 2 weeks?
+E_100,Do you currently take hormones?
+E_68,Do you have diabetes?
+E_167,Do you think you are pregnant or are you currently pregnant?
+E_115,Have you had unprotected sex with more than one partner in the last 6 months?
+E_70,Are you significantly overweight compared to people of the same height as you?
+E_10,Are you currently taking or have you recently taken anti-inflammatory drugs (NSAIDs)?
+E_165,Have any of your family members ever had a pneumothorax?
+E_8,Do you currently undergo dialysis?
+E_25,Have any of your family members been diagnosed with cluster headaches?
+E_184,Do you take medication that dilates your blood vessels?
+E_185,Have you ever had a head trauma?
+E_99,Have you ever had a migraine or is a member of your family known to have migraines?
+E_107,Have you ever had a stroke?
+E_226,Are you more likely to develop common allergies than the general population?
+E_62,Do you regularly take stimulant drugs?
+E_49,Do you attend or work in a daycare?
+E_95,Do you have Parkinson’s disease?
+E_36,Do you have metastatic cancer?
+E_153,Are you being treated for osteoporosis?
+E_124,Do you have asthma or have you ever had to use a bronchodilator in the past?
+E_98,Do you have a hiatal hernia?
+E_116,Have you had a cold in the last 2 weeks?
+E_48,Do you live with 4 or more people?
+E_2,Are you infected with the human immunodeficiency virus (HIV)?
+E_227,Are you immunosuppressed?
+E_61,Are you currently using intravenous drugs?
+E_47,Do you suffer from Crohn’s disease or ulcerative colitis (UC)?
+E_27,Have you ever had a sexually transmitted infection?
+E_143,"Do you exercise regularly, 4 times per week or more?"
+E_191,Are you a former smoker?
+E_208,"Is your BMI less than 18.5, or are you underweight?"
+E_126,Do you have liver cirrhosis?
+E_189,Have you had sexual intercourse with an HIV-positive partner in the past 12 months?
+E_7,Do you have a poor diet?
+E_24,Have you ever had a diagnosis of anemia?
+E_26,Do you have any family members who have been diagnosed with anemia?
+E_113,Do you have chronic kidney failure?
+E_160,Were you born prematurely or did you suffer any complication at birth?
+E_28,Are there any members of your family who have been diagnosed myasthenia gravis?
+E_20,Do you have Rheumatoid Arthritis?
+E_80,Have you ever been diagnosed with depression?
+E_40,Have you been in contact with someone who has had pertussis (whoooping cough)?
+E_0,Have you recently had a viral infection?
+E_1,Are you currently being treated or have you recently been treated with an oral antibiotic for an ear infection?
+E_34,Do you have an active cancer?
+E_209,Are your vaccinations up to date?
+E_139,Do you have a known heart defect?
+E_19,Have you been diagnosed with hyperthyroidism?
+E_31,Do you have severe Chronic Obstructive Pulmonary Disease (COPD)?
+E_22,Do you have a known issue with one of your heart valves?
+E_60,Do you consume energy drinks regularly?
+E_35,Do you regularly drink coffee or tea?
+E_213,Have you recently taken decongestants or other substances that may have stimulant effects?
+E_12,Do you have a known severe food allergy?
+E_44,Do you take corticosteroids?
+E_4,Have you or any member of your family ever had croup?
+E_81,Do you suffer from chronic anxiety?
+E_109,Have you ever had deep vein thrombosis (DVT)?
+E_110,Have you been unable to move or get up for more than 3 consecutive days within the last 4 weeks?
+E_17,Are you of Asian descent?
+E_18,Do you have cystic fibrosis?
+E_117,Have you ever had pneumonia?
+E_122,Do you have a chronic obstructive pulmonary disease (COPD)?
+E_207,Do you live in in a big city?
+E_86,"Do you have any close family members who suffer from allergies (any type), hay fever or eczema?"
+E_85,Do you have any family members who have asthma?
+E_141,Did you have your first menstrual period before the age of 12?
+E_11,Have you breastfed one of your children for more than 9 months?
+E_186,Have you ever been diagnosed with obstructive sleep apnea (OSA)?
+E_106,Do you have heart failure?
+E_158,Were you diagnosed with endocrine disease or a hormone dysfunction?
+E_187,Did you eat dark-fleshed fish (such as tuna) or Swiss cheese before the reaction occurred?
+E_6,Do you have chronic pancreatitis?
+E_125,Have you ever been diagnosed with gastroesophageal reflux?
+E_21,Have you ever had a spontaneous pneumothorax?
+E_222,Are you exposed to secondhand cigarette smoke on a daily basis?
+E_15,Have you started or taken any antipsychotic medication within the last 7 days?
+E_147,"Have you been treated in hospital recently for nausea, agitation, intoxication or aggressive behavior and received medication via an intravenous or intramuscular route?"
+E_137,Have you ever had surgery to remove lymph nodes?
+E_149,Do you take a calcium channel blockers (medication)?
+E_197,Do you have a known kidney problem resulting in an inability to retain proteins?
+E_3,Have you ever had a pericarditis?
+E_29,Do any members of your immediate family have a psychiatric illness?
+E_225,Do you have close family members who had a cardiovascular disease problem before the age of 50?
+E_73,"In the last month, have you been in contact with anyone infected with the Ebola virus?"
+E_138,Do you suffer from fibromyalgia?
+E_101,Have you been hospitalized for an asthma attack in the past year?
+E_46,Have you had 2 or more asthma attacks in the past year?
+E_119,Have you been diagnosed with chronic sinusitis?
+E_72,Have you had one or several flare ups of chronic obstructive pulmonary disease (COPD) in the past year?
+E_198,Do you work in agriculture?
+E_200,Do you work in the mining sector?
+E_199,Do you work in construction?
+E_121,Do you have a deviated nasal septum?
+E_120,Do you have polyps in your nose?
+E_142,Does your mother suffer from asthma?
+E_195,Do you live in the suburbs?
+E_183,Do you live in a rural area?
+E_224,Do you have family members who have had lung cancer?
+E_223,Are there members of your family who have been diagnosed with pancreatic cancer?
+E_5,Have you ever had fluid in your lungs?

@@ -1,0 +1,70 @@
+# LightMem Configuration for Qwen3-32B via OpenRouter
+# 
+# This config uses:
+# - LLMLingua-2 for compression
+# - Topic segmentation for coherent memory chunks
+# - OpenRouter/Qwen3-32B for metadata extraction
+# - HuggingFace embeddings (all-MiniLM-L6-v2)
+# - Qdrant local file storage (no SQL)
+# - Embedding-only retrieval (no context/BM25)
+# - Offline update mode (but not called during trials)
+#
+# IMPORTANT: LightMem's OpenAI manager expects these environment variables:
+#   export OPENAI_API_KEY=$OPENROUTER_API_KEY
+#   export OPENAI_BASE_URL=https://openrouter.ai/api/v1
+# (The agent's __main__ sets these automatically when run standalone)
+
+pre_compress: true
+pre_compressor:
+  model_name: llmlingua-2
+  configs:
+    llmlingua_config:
+      model_name: microsoft/llmlingua-2-bert-base-multilingual-cased-meetingbank
+      device_map: cuda
+      use_llmlingua2: true
+
+topic_segment: true
+precomp_topic_shared: true
+topic_segmenter:
+  model_name: llmlingua-2
+
+messages_use: user_only
+metadata_generate: true
+text_summary: true
+
+memory_manager:
+  model_name: openai
+  configs:
+    model: qwen/qwen3-32b
+    max_tokens: 16000
+
+extract_threshold: 0.1
+
+# === SIMPLIFIED: Embedding-only, no SQL ===
+index_strategy: embedding
+text_embedder:
+  model_name: huggingface
+  configs:
+    model: sentence-transformers/all-MiniLM-L6-v2
+    embedding_dims: 384
+    model_kwargs:
+      device: cuda
+
+retrieve_strategy: embedding
+embedding_retriever:
+  model_name: qdrant
+  configs:
+    collection_name: lightmem_default  # Overridden per session in agent code
+    embedding_model_dims: 384
+    path: ./qdrant_storage/lightmem  # Overridden per session in agent code
+
+# === NO OFFLINE UPDATES during trials ===
+# Set to offline but we don't call the methods during evaluation
+update: offline
+
+logging:
+  level: INFO
+  file_enabled: true
+  log_dir: ./logs/lightmem
+
+

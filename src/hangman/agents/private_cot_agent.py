@@ -39,9 +39,9 @@ class PrivateCoTAgent(BaseAgent):
     appends that trace to its working memory for future turns.
     """
 
-    def __init__(self, main_llm_provider: LLMProvider):
+    def __init__(self, llm_provider: LLMProvider):
         # This agent only needs one LLM provider.
-        super().__init__(llm_provider=main_llm_provider)
+        super().__init__(llm_provider=llm_provider)
         self.turn_counter = 0
         self.reset()
 
@@ -181,7 +181,7 @@ if __name__ == "__main__":
         print(f"❌ Failed to load LLM Provider: {e}")
         raise SystemExit(1)
 
-    agent = PrivateCoTAgent(main_llm_provider=main_llm)
+    agent = PrivateCoTAgent(llm_provider=main_llm)
     print("🤖 PrivateCoTAgent is ready. Type 'quit', 'exit', or 'q' to end.")
 
     messages: List[BaseMessage] = []

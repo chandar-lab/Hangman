@@ -36,7 +36,7 @@ class ReActMemAgent(BaseAgent):
     """
     def __init__(
         self,
-        main_llm_provider: LLMProvider,
+        llm_provider: LLMProvider,
         tools: Optional[List[Any]] = None,
         strategy: str = "overwrite",
         add_save_secret_hint: bool = True,
@@ -65,9 +65,9 @@ class ReActMemAgent(BaseAgent):
         self._has_code_tool = "code_interpreter" in self.tools_by_name
 
         # Bind the tools to the LLM
-        self.model = main_llm_provider.client.bind_tools(self.tools)
+        self.model = llm_provider.client.bind_tools(self.tools)
 
-        super().__init__(llm_provider=main_llm_provider)
+        super().__init__(llm_provider=llm_provider)
         self.turn_counter = 0  # Used for thread management
         self.reset()
 
@@ -434,7 +434,7 @@ if __name__ == "__main__":
         print(f"❌ Failed to load LLM Provider: {e}")
         exit()
 
-    agent = ReActMemAgent(main_llm_provider=main_llm, strategy="patch_and_replace")
+    agent = ReActMemAgent(llm_provider=main_llm, strategy="patch_and_replace")
     print("🤖 ReActMemAgent is ready. Type 'quit', 'exit', or 'q' to end.")
 
     messages = []

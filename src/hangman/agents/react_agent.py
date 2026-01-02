@@ -22,12 +22,12 @@ class AgentState(TypedDict, total=False):
 class ReActAgent(BaseAgent):
     """Stateless ReAct agent (no working memory). Accepts pre-initialized tools."""
 
-    def __init__(self, main_llm_provider: LLMProvider, tools: Optional[List[Any]] = None):
+    def __init__(self, llm_provider: LLMProvider, tools: Optional[List[Any]] = None):
         self.tools = tools or []  # no update_memory by default
         self.tools_by_name = {t.name: t for t in self.tools}
-        self.model = main_llm_provider.client.bind_tools(self.tools)
+        self.model = llm_provider.client.bind_tools(self.tools)
 
-        super().__init__(llm_provider=main_llm_provider)
+        super().__init__(llm_provider=llm_provider)
         self.turn_counter = 0
         self.reset()
 
@@ -185,7 +185,7 @@ if __name__ == "__main__":
         yaml.safe_load(f)
 
     main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local_vllm_native")
-    agent = ReActAgent(main_llm_provider=main_llm)
+    agent = ReActAgent(llm_provider=main_llm)
     print("ReActAgent (stateless) ready.")
     messages: List[BaseMessage] = []
     while True:

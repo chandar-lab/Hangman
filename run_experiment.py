@@ -54,10 +54,10 @@ def _instantiate_agent_from_spec(
 
         if "llm_provider" in params and "llm_provider" not in kwargs:
             kwargs["llm_provider"] = default_main
-        if "main_llm_provider" in params and "main_llm_provider" not in kwargs:
-            kwargs["main_llm_provider"] = default_main
-        if "responder_llm_provider" in params and "responder_llm_provider" not in kwargs:
-            kwargs["responder_llm_provider"] = default_main
+        if "llm_provider" in params and "llm_provider" not in kwargs:
+            kwargs["llm_provider"] = default_main
+        if "llm_provider" in params and "llm_provider" not in kwargs:
+            kwargs["llm_provider"] = default_main
         if "updater_llm_provider" in params and "updater_llm_provider" not in kwargs:
             kwargs["updater_llm_provider"] = default_main
         

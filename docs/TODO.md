@@ -30,3 +30,13 @@ A concise plan of next actions to support Objective 1 (PSITs) and the experiment
 - Prompt variations for sensitivity ablation (e.g., how many variants, what changes)?
 - Win rate approximation method (regex reliability vs. more human checks)?
 - Compute trade-offs: Trial counts per condition (500 vs. 1000) given costs. 
+
+
+
+
+
+- Qualitative analysis of the yellows
+- Finish experiments ofor all tasks
+- Document Failure Cases
+- Enrich prompts
+

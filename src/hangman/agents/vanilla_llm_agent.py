@@ -22,9 +22,9 @@ class VanillaLLMAgent(BaseAgent):
     """
     A vanilla stateless LLM agent. No private memory, no tools.
     """
-    def __init__(self, main_llm_provider: LLMProvider):
-        self.model = main_llm_provider.client
-        super().__init__(llm_provider=main_llm_provider)
+    def __init__(self, llm_provider: LLMProvider):
+        self.model = llm_provider.client
+        super().__init__(llm_provider=llm_provider)
         self.reset()
 
     def _build_workflow(self) -> StateGraph:
@@ -77,7 +77,7 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ Failed to load LLM Provider: {e}")
         exit()
-    agent = VanillaLLMAgent(main_llm_provider=main_llm)
+    agent = VanillaLLMAgent(llm_provider=main_llm)
     print("🤖 VanillaLLMAgent is ready. Type 'quit', 'exit', or 'q' to end.")
     messages = []
     while True:

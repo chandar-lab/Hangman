@@ -1,0 +1,62 @@
+game: hangman_sct
+
+agents:
+#   - VanillaLLMAgent:
+#       name: vanilla_llm_agent
+#   - PrivateCoTAgent:
+#       name: private_cot_agent
+#   - ReActMemAgent:
+#       strategy: overwrite
+#       name: reactmem_overwrite_agent
+#   - ReActMemAgent:
+#       strategy: patch_and_replace
+#       name: reactmem_patch_and_replace_agent
+#   - ReActMemAgent:
+#       strategy: append_and_delete
+#       name: reactmem_append_and_delete_agent
+  # - WorkflowAgent:
+  #     strategy: overwrite
+  #     name: workflow_overwrite_agent
+  # - WorkflowAgent:
+  #     strategy: patch_and_replace
+  #     name: workflow_patch_and_replace_agent
+  # - WorkflowAgent:
+  #     strategy: append_and_delete
+  #     name: workflow_append_and_delete_agent
+#   - Mem0Agent:
+#       name: mem0_agent
+#       mem0_config_path: ./config/mem0_config_qwen3_32b.yaml
+#   - AMemAgent:
+#       name: amem_agent
+#       amem_llm_model: qwen/qwen3-32b
+#   # - LettaAgent:
+#   #     name: letta_agent
+#   #     letta_config_path: ./config/letta_config_qwen3_32b.yaml
+#   - LightMemAgent:
+#       name: lightmem_agent
+#       lightmem_config_path: ./config/lightmem_config_qwen3_32b.yaml
+  - MemoryOSAgent:
+      name: memoryos_agent
+      memoryos_config_path: ./config/memoryos_config_qwen3_32b.yaml
+
+num_trials: 50
+
+providers:
+  main: qwen3_32b_openrouter
+  concurrency: 16
+
+results_dir: results/qwen3_32b_openrouter/hangman_sct/
+sct:
+  t_fork: 4
+  T_max: 20
+  random_seed: 12
+  n_candidate_secrets: 5
+
+  stateless_candidates:
+    method: deterministic  # deterministic | llm
+
+    llm:
+      provider: gpt_oss_120b_openrouter
+      max_n: 20
+
+

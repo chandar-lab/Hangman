@@ -1,0 +1,23 @@
+# Letta Agent Configuration for GPT-OSS-120B
+# This config is used by LettaAgent to create agents on the Letta server
+# 
+# Prerequisites:
+#   1. Start Letta server: letta server --host 127.0.0.1 --port 8283
+#   2. Set environment variable: export OPENROUTER_API_KEY=your_key_here
+#
+# Note: Memory blocks (persona/human) are defined in src/hangman/prompts/letta_agent.py
+#       Letta's default system prompt is used (explains memory tools comprehensively)
+
+server:
+  base_url: http://localhost:8283
+  timeout: 1000
+
+llm:
+  model: openai/gpt-oss-120b
+  endpoint: https://openrouter.ai/api/v1
+  context_window: 16384
+
+embedding:
+  model: openai/text-embedding-3-large
+  endpoint: https://openrouter.ai/api/v1
+  dimension: 1536

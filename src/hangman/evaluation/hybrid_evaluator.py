@@ -276,7 +276,7 @@ class HybridEvaluator:
     def evaluate_trial(
         self,
         trial_data: Dict[str, Any],
-        metrics: Optional[List[str]] = None,
+        metrics: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         Evaluate the given trial JSON using the configured modes.
@@ -288,7 +288,10 @@ class HybridEvaluator:
             raise ValueError("Trial data must contain an 'interaction_log' key.")
 
         full_log: List[List[Any]] = trial_data["interaction_log"]
-        chosen_metrics = metrics or ["intentionality", "secrecy", "mechanism", "coherence"]
+        # Support metrics as either a single list for all modes or a dict per mode
+        default_metrics = ["intentionality", "secrecy", "mechanism", "coherence"]
+        metrics_is_dict = isinstance(metrics, dict)
+        chosen_metrics = metrics if isinstance(metrics, list) else (metrics or default_metrics)
 
         # Normalize modes
         def _normalize_modes(mode_spec: Union[str, List[str]]) -> List[str]:
@@ -319,7 +322,14 @@ class HybridEvaluator:
 
             results_local: Dict[str, Any] = {}
 
-            if "intentionality" in chosen_metrics and "intentionality" in metric_prompts:
+            # Determine which metrics to compute for this mode
+            mode_metrics: List[str]
+            if metrics_is_dict:
+                mode_metrics = list((metrics or {}).get(effective_mode, []))
+            else:
+                mode_metrics = list(chosen_metrics)
+
+            if "intentionality" in mode_metrics and "intentionality" in metric_prompts:
                 logging.info(f"Evaluating 'Intentionality' ({effective_mode})...")
                 results_local["intentionality"] = self._evaluate_metric(
                     prompt_template=metric_prompts["intentionality"],
@@ -328,7 +338,7 @@ class HybridEvaluator:
                     format_instructions=format_instructions,
                 )
 
-            if "secrecy" in chosen_metrics and "secrecy" in metric_prompts:
+            if "secrecy" in mode_metrics and "secrecy" in metric_prompts:
                 logging.info(f"Evaluating 'Secrecy' ({effective_mode})...")
                 results_local["secrecy"] = self._evaluate_metric(
                     prompt_template=metric_prompts["secrecy"],
@@ -337,7 +347,7 @@ class HybridEvaluator:
                     format_instructions=format_instructions,
                 )
 
-            if "mechanism" in chosen_metrics and "mechanism" in metric_prompts:
+            if "mechanism" in mode_metrics and "mechanism" in metric_prompts:
                 logging.info(f"Evaluating 'Mechanism' ({effective_mode})...")
                 results_local["mechanism"] = self._evaluate_metric(
                     prompt_template=metric_prompts["mechanism"],
@@ -346,7 +356,7 @@ class HybridEvaluator:
                     format_instructions=format_instructions,
                 )
 
-            if "coherence" in chosen_metrics and "coherence" in metric_prompts:
+            if "coherence" in mode_metrics and "coherence" in metric_prompts:
                 logging.info(f"Evaluating 'Conversational Coherence' ({effective_mode})...")
                 results_local["coherence"] = self._evaluate_metric(
                     prompt_template=metric_prompts["coherence"],

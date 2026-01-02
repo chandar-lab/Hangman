@@ -1,0 +1,26 @@
+#!/bin/bash
+#SBATCH --job-name=run_twenty_questions_gptossbig
+#SBATCH --output=logs/output/experiment-tq-gptossbig-%A.%a.out
+#SBATCH --error=logs/error/experiment-tq-gptossbig-%A.%a.err
+#SBATCH --time=7-00:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=32G
+#SBATCH --partition=long-cpu
+
+# Cd to project root
+cd /home/mila/b/baldelld/scratch/hangman
+
+# Create directories for logs
+mkdir -p logs/output logs/error
+
+# Activate the virtual environment
+source .venv/bin/activate || true
+
+echo "--- Starting Twenty Questions GPT-OSS-120B Run (CPU-only) ---"
+python run_experiment.py --run-config ./config/twenty_questions_gptossbig_run.yaml
+
+echo "--- Experiment finished ---"
+
+

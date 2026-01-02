@@ -2,6 +2,8 @@ from hangman.games.hangman import HangmanGame
 from hangman.games.twenty_questions import TwentyQuestionsGame
 from hangman.games.zendo import ZendoGame
 from hangman.games.diagnosis_simulator import DiagnosisSimulatorGame
+from hangman.games.hangman_sct import HangmanSCTGame
+from hangman.games.diagnosis_simulator_sct import DiagnosisSimulatorSCTGame
 
 
 def create_game(game_name: str):
@@ -18,6 +20,10 @@ def create_game(game_name: str):
     name = (game_name or "hangman").lower()
     if name in ("hangman", "hg"):
         return HangmanGame(), "hangman"
+    if name in ("hangman_sct", "hg_sct"):
+        return HangmanSCTGame(), "hangman_sct"
+    if name in ("diagnosis_simulator_sct", "diagnosis_sct", "ds_sct"):
+        return DiagnosisSimulatorSCTGame(), "diagnosis_simulator_sct"
     if name in ("20_questions", "20q", "twenty_questions"):
         return TwentyQuestionsGame(), "twenty_questions"
     if name == "zendo":

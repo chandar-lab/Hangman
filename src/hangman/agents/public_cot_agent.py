@@ -66,7 +66,7 @@ class PublicCoTAgent(BaseAgent):
         return {}
 
     def get_private_state(self) -> str:
-        return ""
+        return "N/A"
 
     def reset(self) -> None:
         # No persistent state to reset
@@ -78,7 +78,7 @@ if __name__ == "__main__":
     with open(CONFIG_PATH, 'r') as f:
         config = yaml.safe_load(f)
     try:
-        main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local_vllm_native")
+        main_llm = load_llm_provider(CONFIG_PATH, provider_name="qwen3_14b_local")
         print("✅ LLM Provider loaded successfully.")
     except Exception as e:
         print(f"❌ Failed to load LLM Provider: {e}")

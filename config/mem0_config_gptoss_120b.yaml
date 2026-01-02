@@ -1,0 +1,12 @@
+vector_store:
+  provider: qdrant
+  config:
+    host: 127.0.0.1
+    port: 6333
+
+llm:
+  provider: litellm
+  config:
+    model: openrouter/openai/gpt-oss-120b
+    api_key: ${OPENROUTER_API_KEY}
+

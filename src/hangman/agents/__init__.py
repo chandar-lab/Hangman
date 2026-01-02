@@ -23,6 +23,11 @@ from hangman.agents.private_cot_agent import PrivateCoTAgent
 from hangman.agents.public_cot_agent import PublicCoTAgent
 from hangman.agents.vanilla_llm_agent import VanillaLLMAgent
 from hangman.agents.workflow_agent import WorkflowAgent
+from hangman.agents.mem0_agent import Mem0Agent
+from hangman.agents.amem_agent import AMemAgent
+from hangman.agents.letta_agent import LettaAgent
+from hangman.agents.lightmem_agent import LightMemAgent
+from hangman.agents.memoryos_agent import MemoryOSAgent
 from hangman.tools import update_memory, get_search_tool, E2BCodeInterpreterTool
 
 # --- Public API of the 'agents' package ---
@@ -34,13 +39,18 @@ __all__ = [
     "PrivateCoTAgent",
     "VanillaLLMAgent",
     "WorkflowAgent",
+    "Mem0Agent",
+    "AMemAgent",
+    "LettaAgent",
+    "LightMemAgent",
+    "MemoryOSAgent",
 ]
 
 # --- Agent Factory --- DEPRECATED, TODO: Update 
 
 def create_agent(
     agent_name: str,
-    main_llm_provider: LLMProvider,
+    llm_provider: LLMProvider,
     distillation_llm_provider: Optional[LLMProvider] = None,
     *,
     enable_websearch: bool = False,
@@ -52,7 +62,7 @@ def create_agent(
 
     Args:
         agent_name (str): The name of the agent class to instantiate (e.g., "ReActAgent").
-        main_llm_provider (LLMProvider): The primary LLM provider for the agent's main actions.
+        llm_provider (LLMProvider): The primary LLM provider for the agent's main actions.
         distillation_llm_provider (Optional[LLMProvider]): An optional LLM provider for agents
             that use a separate distillation/reasoning loop. Required for "ReaDis..." agents.
 
@@ -69,17 +79,25 @@ def create_agent(
             tools.append(get_search_tool(provider=search_provider))
         if enable_code:
             tools.append(E2BCodeInterpreterTool().as_langchain_tool())
-        return ReActAgent(main_llm_provider=main_llm_provider, tools=tools)
+        return ReActAgent(llm_provider=llm_provider, tools=tools)
     elif agent_name == "ReActMemAgent":
         tools: List = [update_memory]
         if enable_websearch:
             tools.append(get_search_tool(provider=search_provider))
         if enable_code:
             tools.append(E2BCodeInterpreterTool().as_langchain_tool())
-        return ReActMemAgent(main_llm_provider=main_llm_provider, tools=tools)
+        return ReActMemAgent(llm_provider=llm_provider, tools=tools)
     elif agent_name in ["PrivateCoTAgent", "ProvatCoTAgent"]:
         # Backward compatibility alias: support "ProvatCoTAgent"
-        return PrivateCoTAgent(main_llm_provider=main_llm_provider)
+        return PrivateCoTAgent(llm_provider=llm_provider)
+    elif agent_name == "Mem0Agent":
+        return Mem0Agent(llm_provider=llm_provider)
+    elif agent_name == "AMemAgent":
+        return AMemAgent(llm_provider=llm_provider)
+    elif agent_name == "LettaAgent":
+        return LettaAgent(llm_provider=llm_provider)
+    elif agent_name == "MemoryOSAgent":
+        return MemoryOSAgent(llm_provider=llm_provider)
 
     # Agents that require a distillation LLM provider
     elif agent_name in ["ReaDisPatActAgent", "ReaDisOveActAgent", "ReaDisUpdActAgent"]:
@@ -89,11 +107,11 @@ def create_agent(
             )
         
         if agent_name == "ReaDisPatActAgent":
-            return ReaDisPatActAgent(main_llm_provider=main_llm_provider, distillation_llm_provider=distillation_llm_provider)
+            return ReaDisPatActAgent(llm_provider=llm_provider, distillation_llm_provider=distillation_llm_provider)
         elif agent_name == "ReaDisOveActAgent":
-            return ReaDisOveActAgent(main_llm_provider=main_llm_provider, distillation_llm_provider=distillation_llm_provider)
+            return ReaDisOveActAgent(llm_provider=llm_provider, distillation_llm_provider=distillation_llm_provider)
         elif agent_name == "ReaDisUpdActAgent":
-            return ReaDisUpdActAgent(main_llm_provider=main_llm_provider, distillation_llm_provider=distillation_llm_provider)
+            return ReaDisUpdActAgent(llm_provider=llm_provider, distillation_llm_provider=distillation_llm_provider)
 
     # Handle unknown agent names
     else:

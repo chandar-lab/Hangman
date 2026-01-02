@@ -135,11 +135,58 @@ class ChatOpenRouter(BaseClient):
 
         final_text = msg.get("content") or ""
         reasoning_text = msg.get("reasoning") or ""  # OpenRouter returns a string when exposed
+        server_tool_calls = msg.get("tool_calls")
+
+        # Finalization retry (two-pass emulation): if we only got reasoning and no final text,
+        # and there are no tool calls, ask for a concise final answer only.
+        if (not final_text or not str(final_text).strip()) and (not server_tool_calls):
+            try:
+                finalize_messages = list(wire_messages)
+                # Append the just-produced reasoning so the model can finalize from it.
+                if isinstance(reasoning_text, str) and reasoning_text.strip():
+                    finalize_messages.append(
+                        {
+                            "role": "assistant",
+                            "content": f"<{self.think_tag}>{reasoning_text}</{self.think_tag}>",
+                        }
+                    )
+                finalize_messages += [
+                    {
+                        "role": "system",
+                        "content": (
+                            "Based on your prior analysis, provide ONLY the final user-facing answer. "
+                            "Do not include reasoning, tags, tool calls, or code fences."
+                        ),
+                    }
+                ]
+                finalize_resp = self._sdk.chat.completions.create(
+                    model=self.model_name,
+                    messages=finalize_messages,
+                    temperature=self.temperature,
+                    max_tokens=min(self.max_tokens, 256),
+                    tools=None,
+                    tool_choice="none",
+                    extra_body=None,
+                    timeout=self.request_timeout_s,
+                )
+                finalize_raw = finalize_resp.model_dump()
+                finalize_choice = finalize_raw["choices"][0]
+                finalize_msg = finalize_choice["message"]
+                finalized_text = finalize_msg.get("content") or ""
+                if finalized_text and str(finalized_text).strip():
+                    final_text = finalized_text
+                    # Ensure we stay without tool calls for the finalized content
+                    server_tool_calls = None
+                    # Optionally mark metadata
+                    choice["retry_finalized"] = True
+            except Exception:
+                # If finalization fails, fall through with original (possibly empty) final_text
+                pass
 
         # Make it compatible with your parse_response(...): embed <think>...</think> at the top.
         content = self._compose_content_with_think(final_text, reasoning_text)
 
-        tool_calls = self._to_langchain_tool_calls(msg.get("tool_calls"))
+        tool_calls = self._to_langchain_tool_calls(server_tool_calls)
 
         # Attach useful metadata
         addl = {
@@ -149,6 +196,8 @@ class ChatOpenRouter(BaseClient):
             "provider": "openrouter",
             "model": raw.get("model"),
         }
+        if choice and isinstance(choice, dict) and choice.get("retry_finalized"):
+            addl["retry_finalized"] = True
 
         return AIMessage(content=content, tool_calls=tool_calls, additional_kwargs=addl)
 

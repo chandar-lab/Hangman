@@ -1,0 +1,57 @@
+game: twenty_questions
+
+providers:
+  main: qwen3_235b_openrouter
+  player: qwen3_235b_openrouter
+  judge: kimi_k2_openrouter
+  concurrency: 16
+  judge_concurrency: 4
+
+agents:
+  - VanillaLLMAgent:
+      name: vanilla_llm_agent
+  - PrivateCoTAgent:
+      name: private_cot_agent
+  - ReActMemAgent:
+      strategy: overwrite
+      name: reactmem_overwrite_agent
+  - ReActMemAgent:
+      strategy: patch_and_replace
+      name: reactmem_patch_and_replace_agent
+  - ReActMemAgent:
+      strategy: append_and_delete
+      name: reactmem_append_and_delete_agent
+  - WorkflowAgent:
+      strategy: overwrite
+      name: workflow_overwrite_agent
+  - WorkflowAgent:
+      strategy: patch_and_replace
+      name: workflow_patch_and_replace_agent
+  - WorkflowAgent:
+      strategy: append_and_delete
+      name: workflow_append_and_delete_agent
+
+num_trials: 50
+max_turns: 24
+
+results_dir: results/qwen_3_235b/twenty_questions/
+
+first_mover: player
+
+evaluator:
+  mode: all
+  judge_llm_provider: kimi_k2_openrouter
+
+metrics:
+  behavioral:
+    - coherence
+    - winner
+    - secrecy
+  memory:
+    - intentionality
+    - secrecy
+  rule_based:
+    - intentionality
+    - secrecy
+
+

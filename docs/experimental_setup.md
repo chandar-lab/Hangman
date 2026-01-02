@@ -6,7 +6,7 @@ This document outlines the experimental design for evaluating Private Space Inte
 - **Tasks (Games)**: Hangman, Twenty Questions, Diagnosis Simulator (3 core; optionally Zendo as 4th for diversity, but consider removing to reduce compute).
 - **Models**: Qwen3 14B and GPT-OSS 20B for main experiments; GPT-OSS 120B for model scale ablation.
 - **Agents**: WorkflowAgent and ReActMemAgent (with 3 memory strategies each); Baselines: VanillaLLMAgent, PrivateCoTAgent, ReActAgent (no PublicCoT).
-- **Scale**: 500-1000 trials per condition (agent x strategy x model x game) for mains; smaller (100-200) for ablations.
+- **Scale**: 50 trials per condition (agent x strategy x model x game).
 - **Runs**: Batch via run_experiment.py; use DeepSpeed for efficiency. Estimate costs with notebooks/estimate_cost.ipynb.
 
 ## Hyperparameters

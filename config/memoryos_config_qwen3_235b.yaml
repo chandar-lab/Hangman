@@ -1,0 +1,18 @@
+# MemoryOS Configuration for Qwen3-235B via OpenRouter
+#
+# Note: API key is read from OPENROUTER_API_KEY environment variable
+
+llm_model: qwen/qwen3-235b-a22b-thinking-2507
+
+# Memory tier capacities
+short_term_capacity: 10
+mid_term_heat_threshold: 5
+retrieval_queue_capacity: 7
+long_term_knowledge_capacity: 100
+
+# Data storage (overridden per-session in agent code)
+data_storage_path: ./memoryos_data
+
+# Optional embedding model (if MemoryOS supports custom embeddings)
+# embedding_model_name: all-MiniLM-L6-v2
+

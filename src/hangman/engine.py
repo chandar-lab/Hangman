@@ -281,7 +281,7 @@ if __name__ == "__main__":
     game = HangmanGame()
     player = LLMPlayer(llm_provider=player_llm)
     agent = WorkflowAgent(
-        responder_llm_provider=agent_main_llm,
+        llm_provider=agent_main_llm,
         updater_llm_provider=agent_distill_llm,
         strategy="overwrite"
     )

@@ -1,0 +1,71 @@
+game: diagnosis_simulator_sct
+
+agents:
+#   - VanillaLLMAgent:
+#       name: vanilla_llm_agent
+#   - PrivateCoTAgent:
+#       name: private_cot_agent
+#   - ReActMemAgent:
+#       strategy: overwrite
+#       name: reactmem_overwrite_agent
+#   - ReActMemAgent:
+#       strategy: patch_and_replace
+#       name: reactmem_patch_and_replace_agent
+#   - ReActMemAgent:
+#       strategy: append_and_delete
+#       name: reactmem_append_and_delete_agent
+  # - WorkflowAgent:
+  #     strategy: overwrite
+  #     name: workflow_overwrite_agent
+  # - WorkflowAgent:
+  #     strategy: patch_and_replace
+  #     name: workflow_patch_and_replace_agent
+  # - WorkflowAgent:
+  #     strategy: append_and_delete
+  #     name: workflow_append_and_delete_agent
+#   - Mem0Agent:
+#       name: mem0_agent
+#       mem0_config_path: ./config/mem0_config_gptoss_120b.yaml
+#   - AMemAgent:
+#       name: amem_agent
+#       amem_llm_model: openai/gpt-oss-120b
+# #   - LettaAgent:
+# #       name: letta_agent
+# #       letta_config_path: ./config/letta_config_gptoss_120b.yaml
+#   - LightMemAgent:
+#       name: lightmem_agent
+#       lightmem_config_path: ./config/lightmem_config_gptoss_120b.yaml
+  - MemoryOSAgent:
+      name: memoryos_agent
+      memoryos_config_path: ./config/memoryos_config_gptoss_120b.yaml
+
+num_trials: 50
+
+providers:
+  main: gpt_oss_120b_openrouter
+  concurrency: 16
+
+results_dir: results/gpt_oss_120b_openrouter/diagnosis_simulator_sct/
+
+sct:
+  # Pre-fork and safety bounds
+  t_fork: 4
+  T_max: 20
+  random_seed: 12
+
+  # Candidate set size per trial
+  n_candidate_secrets: 5
+
+  # DDXPlus dataset paths (Option B)
+  evidences_csv_path: ddxplus/evidences.csv
+  conditions_csv_path: ddxplus/conditions.csv
+
+  # Stateless candidate generation configuration
+  stateless_candidates:
+    # deterministic | llm
+    method: deterministic
+
+    # Optional LLM assistance for candidate generation or WM fallback
+    llm:
+      provider: gpt_oss_120b_openrouter
+      max_n: 20

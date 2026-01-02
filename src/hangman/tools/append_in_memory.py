@@ -22,7 +22,6 @@ def append_in_memory(
     Args:
         section_title: The section to append to (e.g., "Goals and Plans", "Facts and Knowledge", "Active Notes").
         lines: A list of strings to append as individual lines.
-        current_memory: The full working-memory string, but do not worry about it.
 
     Returns:
         The updated working memory string.

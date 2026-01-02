@@ -1,8 +1,8 @@
-game: diagnosis_simulator
+game: twenty_questions
 
 providers:
-  main: gpt_oss_20b_openrouter
-  player: gpt_oss_20b_openrouter
+  main: gpt_oss_120b_openrouter
+  player: gpt_oss_120b_openrouter
   judge: kimi_k2_openrouter
   concurrency: 16
   judge_concurrency: 4
@@ -34,12 +34,24 @@ agents:
 num_trials: 50
 max_turns: 24
 
-results_dir: results/gpt_oss/diagnosis_simulator/
+results_dir: results/gpt_oss_big/twenty_questions/
 
 first_mover: player
 
 evaluator:
   mode: all
   judge_llm_provider: kimi_k2_openrouter
+
+metrics:
+  behavioral:
+    - coherence
+    - winner
+    - secrecy
+  memory:
+    - intentionality
+    - secrecy
+  rule_based:
+    - intentionality
+    - secrecy
 
 

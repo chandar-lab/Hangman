@@ -127,15 +127,15 @@ class WorkflowAgent(BaseAgent):
 
     def __init__(
         self,
-        responder_llm_provider: LLMProvider,
+        llm_provider: LLMProvider,
         updater_llm_provider: LLMProvider,
         strategy: StrategyName,
         *,
         initial_memory: Optional[str] = None,
         add_save_secret_hint: bool = True,
     ):
-        super().__init__(llm_provider=responder_llm_provider)
-        self.responder_llm = responder_llm_provider
+        super().__init__(llm_provider=llm_provider)
+        self.responder_llm = llm_provider
         self.updater_llm = updater_llm_provider
         self.strategy: StrategyName = strategy
         self.turn_counter = 0
@@ -422,7 +422,7 @@ if __name__ == "__main__":
         exit()
 
     # Change strategy here: "overwrite", "patch_and_replace", or "append_and_delete"
-    agent = WorkflowAgent(responder_llm_provider=main_llm, updater_llm_provider=update_llm, strategy="overwrite")
+    agent = WorkflowAgent(llm_provider=main_llm, updater_llm_provider=update_llm, strategy="overwrite")
     print(f"🤖 WorkflowAgent ({agent.strategy}) is ready. Type 'quit', 'exit', or 'q' to end.")
 
     messages = []

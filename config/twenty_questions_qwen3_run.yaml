@@ -33,7 +33,7 @@ agents:
       name: workflow_append_and_delete_agent
 
 num_trials: 50
-max_turns: 30
+max_turns: 24
 
 results_dir: results/qwen_3/twenty_questions/
 
@@ -43,4 +43,13 @@ evaluator:
   mode: all
   judge_llm_provider: kimi_k2_openrouter
 
+metrics:
+  behavioral:
+    - coherence
+  memory:
+    - intentionality
+    - secrecy
+  rule_based:
+    - intentionality
+    - secrecy
 

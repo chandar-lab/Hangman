@@ -187,3 +187,18 @@ sbatch scripts/hangman_run
   - `metadata`: game, agent, provider configs, timestamps
   - `interaction_log`: `[utterance, private_state]` per turn
   - `evaluation`: LLMJudge scores per metric/mode
+
+
+## Run Mem0
+
+```
+module load singularity 
+
+singularity exec   --env QDRANT__SERVICE__HTTP_PORT=6333   --env QDRANT__SERVICE__GRPC_PORT=6334   --env QDRANT__STORAGE__STORAGE_PATH=/qdrant/storage   --bind $SCRATCH/qdrant_storage:/qdrant/storage   $SCRATCH/containers/qdrant.sif /qdrant/qdrant
+```
+
+## Run Letta
+
+```
+letta server
+```
