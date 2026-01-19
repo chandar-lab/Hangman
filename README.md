@@ -160,3 +160,15 @@ docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant
 ## Citation
 
 If you use this code, please cite our paper.
+
+```markdown
+@misc{baldelli2026llmscantplayhangman,
+      title={LLMs Can't Play Hangman: On the Necessity of a Private Working Memory for Language Agents}, 
+      author={Davide Baldelli and Ali Parviz and Amal Zouaq and Sarath Chandar},
+      year={2026},
+      eprint={2601.06973},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2601.06973}, 
+}
+```
