@@ -91,7 +91,7 @@ We compare against the following external memory baselines:
 
 Clone and enter the repo:
 ```bash
-git clone <REPOSITORY_URL>
+git clone https://github.com/chandar-lab/Hangman.git
 cd Hangman
 ```
 
