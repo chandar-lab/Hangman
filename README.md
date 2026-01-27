@@ -1,6 +1,6 @@
 # LLMs Can't Play Hangman: On the Necessity of a Private Working Memory for Language Agents
 
-This repository contains the code for the paper **"LLMs Can't Play Hangman: On the Necessity of a Private Working Memory for Language Agents"**.
+This repository contains the code for the paper ["LLMs Can't Play Hangman: On the Necessity of a Private Working Memory for Language Agents"](https://arxiv.org/abs/2601.06973).
 
 ![Alt text](assets/Main_Figure_Hangman.jpg "Main Figure")
 
